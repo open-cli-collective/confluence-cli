@@ -12,10 +12,10 @@ import (
 )
 
 type listOptions struct {
-	limit  int
+	limit     int
 	spaceType string
-	output string
-	noColor bool
+	output    string
+	noColor   bool
 }
 
 // NewCmdList creates the space list command.
@@ -23,10 +23,10 @@ func NewCmdList() *cobra.Command {
 	opts := &listOptions{}
 
 	cmd := &cobra.Command{
-		Use:   "list",
+		Use:     "list",
 		Aliases: []string{"ls"},
-		Short: "List Confluence spaces",
-		Long:  `List all Confluence spaces you have access to.`,
+		Short:   "List Confluence spaces",
+		Long:    `List all Confluence spaces you have access to.`,
 		Example: `  # List all spaces
   cfl space list
 

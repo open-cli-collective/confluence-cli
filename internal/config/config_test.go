@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -170,7 +171,7 @@ func TestDefaultConfigPath(t *testing.T) {
 	home, err := os.UserHomeDir()
 	require.NoError(t, err)
 
-	assert.True(t, filepath.HasPrefix(path, home))
+	assert.True(t, strings.HasPrefix(path, home))
 	assert.Contains(t, path, "cfl")
 	assert.True(t, filepath.Ext(path) == ".yml" || filepath.Ext(path) == ".yaml")
 }

@@ -10,11 +10,11 @@ import (
 
 // ListPagesOptions contains options for listing pages.
 type ListPagesOptions struct {
-	Limit    int
-	Cursor   string
-	Status   string // current, archived, draft
-	Sort     string // title, -title, created-date, -created-date, modified-date, -modified-date
-	Title    string // Filter by title (contains)
+	Limit      int
+	Cursor     string
+	Status     string // current, archived, draft
+	Sort       string // title, -title, created-date, -created-date, modified-date, -modified-date
+	Title      string // Filter by title (contains)
 	BodyFormat string // storage, atlas_doc_format, view
 }
 

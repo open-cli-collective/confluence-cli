@@ -85,7 +85,7 @@ Content format:
 	cmd.Flags().BoolVar(&opts.editor, "editor", false, "Open editor for content")
 	cmd.Flags().Bool("no-markdown", false, "Disable markdown conversion (use raw XHTML)")
 
-	cmd.MarkFlagRequired("title")
+	_ = cmd.MarkFlagRequired("title")
 
 	return cmd
 }

@@ -24,13 +24,13 @@ func (p *PaginatedResponse[T]) HasMore() bool {
 
 // Space represents a Confluence space.
 type Space struct {
-	ID          string           `json:"id"`
-	Key         string           `json:"key"`
-	Name        string           `json:"name"`
-	Type        string           `json:"type"`
-	Status      string           `json:"status"`
+	ID          string            `json:"id"`
+	Key         string            `json:"key"`
+	Name        string            `json:"name"`
+	Type        string            `json:"type"`
+	Status      string            `json:"status"`
 	Description *SpaceDescription `json:"description,omitempty"`
-	Links       Links            `json:"_links,omitempty"`
+	Links       Links             `json:"_links,omitempty"`
 }
 
 // SpaceDescription contains space description in various formats.
