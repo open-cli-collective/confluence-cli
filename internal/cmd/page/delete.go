@@ -71,7 +71,7 @@ func runDelete(pageID string, opts *deleteOptions) error {
 		fmt.Print("Are you sure? [y/N]: ")
 
 		var confirm string
-		fmt.Scanln(&confirm)
+		_, _ = fmt.Scanln(&confirm)
 
 		if confirm != "y" && confirm != "Y" {
 			fmt.Println("Deletion cancelled.")
