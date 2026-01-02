@@ -5,9 +5,10 @@ A command-line interface for Atlassian Confluence Cloud, inspired by [jira-cli](
 ## Features
 
 - Manage Confluence pages from the command line
-- **Markdown-first**: Write pages in markdown, auto-converted to Confluence format
+- **Markdown-first**: Write and view pages in markdown, auto-converted to/from Confluence format
 - List and browse spaces
-- Create and view pages
+- Create, view, and delete pages
+- Upload, download, and list attachments
 - Multiple output formats (table, JSON, plain)
 - Open pages in browser
 
@@ -151,7 +152,7 @@ cfl page list -s DEV -o json
 
 ### `cfl page view <page-id>`
 
-View a Confluence page.
+View a Confluence page. **Content is displayed as markdown by default.**
 
 ```bash
 cfl page view 12345
@@ -162,7 +163,7 @@ cfl page view 12345 -o json
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--raw` | | `false` | Show raw Confluence storage format (XHTML) |
+| `--raw` | | `false` | Show raw Confluence storage format (XHTML) instead of markdown |
 | `--web` | `-w` | `false` | Open page in browser instead of displaying |
 
 **Arguments:**
@@ -214,6 +215,78 @@ cfl page create -s DEV -t "Child Page" --parent 12345
 - `.md`, `.markdown` files → markdown (converted to XHTML)
 - `.html`, `.xhtml`, `.htm` files → XHTML (used as-is)
 - stdin, editor → markdown by default (use `--no-markdown` for XHTML)
+
+---
+
+### `cfl page delete <page-id>`
+
+Delete a Confluence page.
+
+```bash
+cfl page delete 12345
+cfl page delete 12345 --force
+```
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--force` | `-f` | `false` | Skip confirmation prompt |
+
+**Arguments:**
+- `<page-id>` - The page ID (**required**)
+
+---
+
+### `cfl attachment list`
+
+List attachments on a page.
+
+**Aliases:** `cfl attachment ls`, `cfl att list`
+
+```bash
+cfl attachment list --page 12345
+cfl attachment list -p 12345 -l 50
+cfl attachment list -p 12345 -o json
+```
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--page` | `-p` | | Page ID (**required**) |
+| `--limit` | `-l` | `25` | Maximum number of attachments to return |
+
+---
+
+### `cfl attachment upload`
+
+Upload a file as an attachment to a page.
+
+```bash
+cfl attachment upload --page 12345 --file document.pdf
+cfl attachment upload -p 12345 -f image.png --comment "Screenshot"
+```
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--page` | `-p` | | Page ID (**required**) |
+| `--file` | `-f` | | File to upload (**required**) |
+| `--comment` | `-c` | | Comment for the attachment |
+
+---
+
+### `cfl attachment download <attachment-id>`
+
+Download an attachment.
+
+```bash
+cfl attachment download abc123
+cfl attachment download abc123 --output-file document.pdf
+```
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--output-file` | `-o` | (original filename) | Output file path |
+
+**Arguments:**
+- `<attachment-id>` - The attachment ID (**required**)
 
 ---
 
