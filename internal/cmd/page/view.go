@@ -11,6 +11,7 @@ import (
 	"github.com/rianjs/confluence-cli/api"
 	"github.com/rianjs/confluence-cli/internal/config"
 	"github.com/rianjs/confluence-cli/internal/view"
+	"github.com/rianjs/confluence-cli/pkg/md"
 )
 
 type viewOptions struct {
@@ -101,11 +102,16 @@ func runView(pageID string, opts *viewOptions) error {
 		if opts.raw {
 			fmt.Println(content)
 		} else {
-			// TODO: Convert storage format to markdown
-			// For now, show a simplified version
-			fmt.Println("(Content in Confluence storage format - use --raw to see full HTML)")
-			fmt.Println()
-			fmt.Println(content)
+			// Convert storage format (HTML) to markdown
+			markdown, err := md.FromConfluenceStorage(content)
+			if err != nil {
+				// Fall back to raw content if conversion fails
+				fmt.Println("(Failed to convert to markdown, showing raw HTML)")
+				fmt.Println()
+				fmt.Println(content)
+			} else {
+				fmt.Println(markdown)
+			}
 		}
 	} else {
 		fmt.Println("(No content)")
