@@ -48,6 +48,11 @@ func NewCmdList() *cobra.Command {
 }
 
 func runList(opts *listOptions) error {
+	// Validate output format
+	if err := view.ValidateFormat(opts.output); err != nil {
+		return err
+	}
+
 	// Load config
 	cfg, err := config.LoadWithEnv(config.DefaultConfigPath())
 	if err != nil {

@@ -3,6 +3,7 @@ package page
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -51,6 +52,29 @@ func NewCmdList() *cobra.Command {
 }
 
 func runList(opts *listOptions) error {
+	// Validate output format
+	if err := view.ValidateFormat(opts.output); err != nil {
+		return err
+	}
+
+	// Validate limit
+	if opts.limit < 0 {
+		return fmt.Errorf("invalid limit: %d (must be >= 0)", opts.limit)
+	}
+
+	// Render output
+	renderer := view.NewRenderer(view.Format(opts.output), opts.noColor)
+
+	// Handle limit 0 - return empty list
+	if opts.limit == 0 {
+		if opts.output == "json" {
+			renderer.RenderJSON([]interface{}{})
+			return nil
+		}
+		renderer.RenderText("No pages found.")
+		return nil
+	}
+
 	// Load config
 	cfg, err := config.LoadWithEnv(config.DefaultConfigPath())
 	if err != nil {
@@ -90,9 +114,6 @@ func runList(opts *listOptions) error {
 		return fmt.Errorf("failed to list pages: %w", err)
 	}
 
-	// Render output
-	renderer := view.NewRenderer(view.Format(opts.output), opts.noColor)
-
 	if len(result.Results) == 0 {
 		renderer.RenderText(fmt.Sprintf("No pages found in space %s.", spaceKey))
 		return nil
@@ -117,7 +138,7 @@ func runList(opts *listOptions) error {
 	renderer.RenderTable(headers, rows)
 
 	if result.HasMore() {
-		fmt.Printf("\n(showing first %d results, use --limit to see more)\n", len(result.Results))
+		fmt.Fprintf(os.Stderr, "\n(showing first %d results, use --limit to see more)\n", len(result.Results))
 	}
 
 	return nil

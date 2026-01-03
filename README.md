@@ -165,6 +165,7 @@ cfl page view 12345 -o json
 |------|-------|---------|-------------|
 | `--raw` | | `false` | Show raw Confluence storage format (XHTML) instead of markdown |
 | `--web` | `-w` | `false` | Open page in browser instead of displaying |
+| `--show-macros` | | `false` | Show Confluence macro placeholders (e.g., `[TOC]`) instead of stripping them |
 
 **Arguments:**
 - `<page-id>` - The page ID (**required**)
@@ -278,12 +279,12 @@ Download an attachment.
 
 ```bash
 cfl attachment download abc123
-cfl attachment download abc123 --output-file document.pdf
+cfl attachment download abc123 -O document.pdf
 ```
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--output-file` | `-o` | (original filename) | Output file path |
+| `--output-file` | `-O` | (original filename) | Output file path |
 
 **Arguments:**
 - `<attachment-id>` - The attachment ID (**required**)

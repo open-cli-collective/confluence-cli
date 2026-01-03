@@ -20,6 +20,22 @@ const (
 	FormatPlain Format = "plain"
 )
 
+// ValidFormats returns the list of valid output formats.
+func ValidFormats() []string {
+	return []string{string(FormatTable), string(FormatJSON), string(FormatPlain)}
+}
+
+// ValidateFormat checks if a format string is valid.
+// Returns an error if the format is not supported.
+func ValidateFormat(format string) error {
+	switch format {
+	case "", string(FormatTable), string(FormatJSON), string(FormatPlain):
+		return nil
+	default:
+		return fmt.Errorf("invalid output format: %q (valid formats: table, json, plain)", format)
+	}
+}
+
 // Renderer renders data in a specific format.
 type Renderer struct {
 	format  Format

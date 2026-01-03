@@ -15,10 +15,11 @@ import (
 )
 
 type viewOptions struct {
-	raw     bool
-	web     bool
-	output  string
-	noColor bool
+	raw        bool
+	web        bool
+	showMacros bool
+	output     string
+	noColor    bool
 }
 
 // NewCmdView creates the page view command.
@@ -47,11 +48,17 @@ func NewCmdView() *cobra.Command {
 
 	cmd.Flags().BoolVar(&opts.raw, "raw", false, "Show raw Confluence storage format")
 	cmd.Flags().BoolVarP(&opts.web, "web", "w", false, "Open in browser instead of displaying")
+	cmd.Flags().BoolVar(&opts.showMacros, "show-macros", false, "Show Confluence macro placeholders (e.g., [TOC]) instead of stripping them")
 
 	return cmd
 }
 
 func runView(pageID string, opts *viewOptions) error {
+	// Validate output format
+	if err := view.ValidateFormat(opts.output); err != nil {
+		return err
+	}
+
 	// Load config
 	cfg, err := config.LoadWithEnv(config.DefaultConfigPath())
 	if err != nil {
@@ -103,7 +110,10 @@ func runView(pageID string, opts *viewOptions) error {
 			fmt.Println(content)
 		} else {
 			// Convert storage format (HTML) to markdown
-			markdown, err := md.FromConfluenceStorage(content)
+			convertOpts := md.ConvertOptions{
+				ShowMacros: opts.showMacros,
+			}
+			markdown, err := md.FromConfluenceStorageWithOptions(content, convertOpts)
 			if err != nil {
 				// Fall back to raw content if conversion fails
 				fmt.Println("(Failed to convert to markdown, showing raw HTML)")

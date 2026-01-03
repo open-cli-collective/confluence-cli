@@ -3,6 +3,7 @@ package space
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -50,6 +51,29 @@ func NewCmdList() *cobra.Command {
 }
 
 func runList(opts *listOptions) error {
+	// Validate output format
+	if err := view.ValidateFormat(opts.output); err != nil {
+		return err
+	}
+
+	// Validate limit
+	if opts.limit < 0 {
+		return fmt.Errorf("invalid limit: %d (must be >= 0)", opts.limit)
+	}
+
+	// Render output
+	renderer := view.NewRenderer(view.Format(opts.output), opts.noColor)
+
+	// Handle limit 0 - return empty list
+	if opts.limit == 0 {
+		if opts.output == "json" {
+			renderer.RenderJSON([]interface{}{})
+			return nil
+		}
+		renderer.RenderText("No spaces found.")
+		return nil
+	}
+
 	// Load config
 	cfg, err := config.LoadWithEnv(config.DefaultConfigPath())
 	if err != nil {
@@ -73,9 +97,6 @@ func runList(opts *listOptions) error {
 	if err != nil {
 		return fmt.Errorf("failed to list spaces: %w", err)
 	}
-
-	// Render output
-	renderer := view.NewRenderer(view.Format(opts.output), opts.noColor)
 
 	if len(result.Results) == 0 {
 		renderer.RenderText("No spaces found.")
@@ -101,7 +122,7 @@ func runList(opts *listOptions) error {
 	renderer.RenderTable(headers, rows)
 
 	if result.HasMore() {
-		fmt.Printf("\n(showing first %d results, use --limit to see more)\n", len(result.Results))
+		fmt.Fprintf(os.Stderr, "\n(showing first %d results, use --limit to see more)\n", len(result.Results))
 	}
 
 	return nil

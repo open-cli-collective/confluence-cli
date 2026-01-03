@@ -31,7 +31,7 @@ func NewCmdDownload() *cobra.Command {
   cfl attachment download abc123
 
   # Download to a specific file
-  cfl attachment download abc123 --output document.pdf`,
+  cfl attachment download abc123 -O document.pdf`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.output, _ = cmd.Flags().GetString("output")
@@ -40,7 +40,7 @@ func NewCmdDownload() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.outputFile, "output-file", "o", "", "Output file path (default: original filename)")
+	cmd.Flags().StringVarP(&opts.outputFile, "output-file", "O", "", "Output file path (default: original filename)")
 
 	return cmd
 }
