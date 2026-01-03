@@ -42,20 +42,22 @@ archives:
       - LICENSE
       - README.md
 
-# Homebrew tap (disabled until homebrew-confluence-cli repo exists)
-# brews:
-#   - name: cfl
-#     repository:
-#       owner: rianjs
-#       name: homebrew-confluence-cli
-#       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-#     homepage: https://github.com/rianjs/confluence-cli
-#     description: "Command-line interface for Atlassian Confluence"
-#     license: MIT
-#     install: |
-#       bin.install "cfl"
-#     test: |
-#       system "#{bin}/cfl", "--version"
+# Homebrew cask with auto-quarantine removal for unsigned binaries
+homebrew_casks:
+  - name: cfl
+    repository:
+      owner: rianjs
+      name: homebrew-confluence-cli
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/rianjs/confluence-cli
+    description: "Command-line interface for Atlassian Confluence"
+    binary: cfl
+    hooks:
+      post:
+        install: |
+          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/cfl"]
+    caveats: |
+      cfl has been installed. Run 'cfl init' to configure.
 
 checksum:
   name_template: 'checksums.txt'
