@@ -42,19 +42,20 @@ archives:
       - LICENSE
       - README.md
 
-brews:
-  - name: cfl
-    repository:
-      owner: rianjs
-      name: homebrew-confluence-cli
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    homepage: https://github.com/rianjs/confluence-cli
-    description: "Command-line interface for Atlassian Confluence"
-    license: MIT
-    install: |
-      bin.install "cfl"
-    test: |
-      system "#{bin}/cfl", "--version"
+# Homebrew tap (disabled until homebrew-confluence-cli repo exists)
+# brews:
+#   - name: cfl
+#     repository:
+#       owner: rianjs
+#       name: homebrew-confluence-cli
+#       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+#     homepage: https://github.com/rianjs/confluence-cli
+#     description: "Command-line interface for Atlassian Confluence"
+#     license: MIT
+#     install: |
+#       bin.install "cfl"
+#     test: |
+#       system "#{bin}/cfl", "--version"
 
 checksum:
   name_template: 'checksums.txt'
