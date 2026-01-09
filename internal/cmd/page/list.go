@@ -68,8 +68,7 @@ func runList(opts *listOptions) error {
 	// Handle limit 0 - return empty list
 	if opts.limit == 0 {
 		if opts.output == "json" {
-			renderer.RenderJSON([]interface{}{})
-			return nil
+			return renderer.RenderJSON([]interface{}{})
 		}
 		renderer.RenderText("No pages found.")
 		return nil

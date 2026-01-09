@@ -7,7 +7,7 @@ A command-line interface for Atlassian Confluence Cloud, inspired by [jira-cli](
 - Manage Confluence pages from the command line
 - **Markdown-first**: Write and view pages in markdown, auto-converted to/from Confluence format
 - List and browse spaces
-- Create, view, and delete pages
+- Create, view, edit, and delete pages
 - Upload, download, and list attachments
 - Multiple output formats (table, JSON, plain)
 - Open pages in browser
@@ -219,6 +219,43 @@ cfl page create -s DEV -t "Child Page" --parent 12345
 
 ---
 
+### `cfl page edit <page-id>`
+
+Edit an existing Confluence page.
+
+Content can be provided via:
+- `--file` flag to read from a file
+- Standard input (pipe content)
+- Interactive editor (default, opens with existing content)
+
+**Markdown is the default format.** Content is automatically converted to Confluence storage format.
+
+```bash
+# Open editor with existing page content
+cfl page edit 12345
+
+# Update page content from markdown file
+cfl page edit 12345 --file updated-content.md
+
+# Update page content from stdin
+echo "# Updated Content" | cfl page edit 12345
+
+# Update only the page title
+cfl page edit 12345 --title "New Title"
+```
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--title` | `-t` | | New page title (keeps existing if not specified) |
+| `--file` | `-f` | | Read content from file |
+| `--editor` | | `false` | Force open in $EDITOR |
+| `--no-markdown` | | `false` | Disable markdown conversion (use raw XHTML) |
+
+**Arguments:**
+- `<page-id>` - The page ID (**required**)
+
+---
+
 ### `cfl page delete <page-id>`
 
 Delete a Confluence page.
@@ -262,14 +299,14 @@ Upload a file as an attachment to a page.
 
 ```bash
 cfl attachment upload --page 12345 --file document.pdf
-cfl attachment upload -p 12345 -f image.png --comment "Screenshot"
+cfl attachment upload -p 12345 -f image.png -m "Screenshot"
 ```
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--page` | `-p` | | Page ID (**required**) |
 | `--file` | `-f` | | File to upload (**required**) |
-| `--comment` | `-c` | | Comment for the attachment |
+| `--comment` | `-m` | | Comment for the attachment |
 
 ---
 

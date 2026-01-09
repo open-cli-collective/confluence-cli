@@ -32,8 +32,8 @@ func NewCmdUpload() *cobra.Command {
 		Example: `  # Upload a file
   cfl attachment upload --page 12345 --file document.pdf
 
-  # Upload with a comment
-  cfl attachment upload --page 12345 --file image.png --comment "Screenshot"`,
+  # Upload with a comment (-m for message/comment)
+  cfl attachment upload --page 12345 --file image.png -m "Screenshot"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.output, _ = cmd.Flags().GetString("output")
 			opts.noColor, _ = cmd.Flags().GetBool("no-color")
@@ -43,7 +43,7 @@ func NewCmdUpload() *cobra.Command {
 
 	cmd.Flags().StringVarP(&opts.pageID, "page", "p", "", "Page ID (required)")
 	cmd.Flags().StringVarP(&opts.file, "file", "f", "", "File to upload (required)")
-	cmd.Flags().StringVarP(&opts.comment, "comment", "c", "", "Comment for the attachment")
+	cmd.Flags().StringVarP(&opts.comment, "comment", "m", "", "Comment for the attachment")
 
 	_ = cmd.MarkFlagRequired("page")
 	_ = cmd.MarkFlagRequired("file")
