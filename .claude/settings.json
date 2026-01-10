@@ -29,11 +29,13 @@
       "Bash(rm -rf dist/:*)",
       "Bash(rm coverage:*)",
 
+      "WebFetch(domain:atlassian.com)",
       "WebFetch(domain:*.atlassian.com)",
       "WebFetch(domain:*.atlassian.net)",
       "WebFetch(domain:*.github.com)",
       "WebFetch(domain:confluence.atlassian.com)",
       "WebFetch(domain:developer.atlassian.com)",
+      "WebFetch(domain:*.developer.atlassian.com)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:go.dev)",
       "WebFetch(domain:golang.org)",
