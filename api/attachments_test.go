@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -136,4 +137,104 @@ func TestClient_DeleteAttachment_NotFound(t *testing.T) {
 	client := NewClient(server.URL, "user@example.com", "token")
 	err := client.DeleteAttachment(context.Background(), "invalid")
 	require.Error(t, err)
+}
+
+func TestClient_UploadAttachment_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/rest/api/content/12345/child/attachment", r.URL.Path)
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "nocheck", r.Header.Get("X-Atlassian-Token"))
+		assert.Contains(t, r.Header.Get("Content-Type"), "multipart/form-data")
+
+		// Parse multipart form
+		err := r.ParseMultipartForm(10 << 20)
+		require.NoError(t, err)
+
+		// Verify file is present
+		file, header, err := r.FormFile("file")
+		require.NoError(t, err)
+		defer func() { _ = file.Close() }()
+		assert.Equal(t, "test.txt", header.Filename)
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"results": [{
+				"id": "att123",
+				"title": "test.txt",
+				"mediaType": "text/plain",
+				"fileSize": 12
+			}]
+		}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	content := strings.NewReader("test content")
+	att, err := client.UploadAttachment(context.Background(), "12345", "test.txt", content, "")
+
+	require.NoError(t, err)
+	assert.Equal(t, "att123", att.ID)
+	assert.Equal(t, "test.txt", att.Title)
+	assert.Equal(t, int64(12), att.FileSize)
+}
+
+func TestClient_UploadAttachment_WithComment(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		err := r.ParseMultipartForm(10 << 20)
+		require.NoError(t, err)
+
+		// Verify comment field is present
+		comment := r.FormValue("comment")
+		assert.Equal(t, "This is a test attachment", comment)
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"results": [{
+				"id": "att123",
+				"title": "test.txt",
+				"mediaType": "text/plain",
+				"fileSize": 12
+			}]
+		}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	content := strings.NewReader("test content")
+	att, err := client.UploadAttachment(context.Background(), "12345", "test.txt", content, "This is a test attachment")
+
+	require.NoError(t, err)
+	assert.Equal(t, "att123", att.ID)
+}
+
+func TestClient_UploadAttachment_APIError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"message": "Permission denied"}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	content := strings.NewReader("test content")
+	att, err := client.UploadAttachment(context.Background(), "12345", "test.txt", content, "")
+
+	require.Error(t, err)
+	assert.Nil(t, att)
+	assert.Contains(t, err.Error(), "Permission denied")
+}
+
+func TestClient_UploadAttachment_EmptyResults(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"results": []}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	content := strings.NewReader("test content")
+	att, err := client.UploadAttachment(context.Background(), "12345", "test.txt", content, "")
+
+	require.Error(t, err)
+	assert.Nil(t, att)
+	assert.Contains(t, err.Error(), "no attachment returned from upload")
 }
