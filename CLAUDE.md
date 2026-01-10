@@ -57,3 +57,65 @@ The `pkg/md` package handles format conversion:
 - `from_html.go`: XHTML → Markdown (uses html-to-markdown)
 
 Format auto-detection: `.md` files → markdown, `.html/.xhtml` → storage format, stdin/editor → markdown by default.
+
+## Testing Philosophy
+
+### Goals
+- **Safety**: Destructive operations (delete, overwrite) must be tested
+- **Recoverability**: Network failures, malformed responses shouldn't corrupt state
+- **Pleasant UX**: Clear error messages, graceful degradation
+
+### What We Test (Priority Order)
+1. Security-sensitive paths (path traversal, credential handling)
+2. Destructive operations (delete confirmations)
+3. API client behavior (auth, errors, edge cases)
+4. Data transformations (markdown ↔ Confluence HTML)
+
+### Go Testing Idioms
+
+**HTTP mocking**: Use `httptest.NewServer()` - no interface needed
+```go
+server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+    // verify request, return mock response
+}))
+client := api.NewClient(server.URL, "test@example.com", "token")
+```
+
+**Injectable stdin for confirmations**: Use `io.Reader` parameter
+```go
+type deleteOptions struct {
+    stdin io.Reader  // injectable for testing
+}
+// Test: opts.stdin = strings.NewReader("y\n")
+```
+
+**Consumer-defined interfaces**: Define small interfaces at point of use
+```go
+// In the command file, not a central interfaces package
+type pageAPI interface {
+    GetPage(ctx context.Context, id string) (*api.Page, error)
+    DeletePage(ctx context.Context, id string) error
+}
+```
+
+**Temp directories**: Use `t.TempDir()` for file operations
+
+### What NOT to Do
+- No giant interface packages
+- No DI frameworks (wire, dig)
+- No reflection-based mocking unless necessary
+- Don't mock what you can test with httptest
+
+### Test Organization
+- `*_test.go` next to implementation
+- `testdata/` for JSON fixtures
+- Table-driven tests with `t.Run()`
+- Use `github.com/stretchr/testify/assert` and `require`
+
+## Undocumented Constants
+
+| Constant | Value | Location |
+|----------|-------|----------|
+| API timeout | 30s | `api/client.go:16` |
+| Init verify timeout | 10s | `internal/cmd/init/init.go:166` |
+| Config permissions | 0600 | `internal/config/config.go` |

@@ -205,3 +205,125 @@ func TestClient_DeletePage(t *testing.T) {
 
 	require.NoError(t, err)
 }
+
+// Edge case tests
+
+func TestClient_ListPages_EmptyResults(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"results": []}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	result, err := client.ListPages(context.Background(), "123456", nil)
+
+	require.NoError(t, err)
+	assert.Len(t, result.Results, 0)
+	assert.False(t, result.HasMore())
+}
+
+func TestClient_ListPages_NullVersion(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"results": [
+				{"id": "123", "title": "Test Page", "status": "current", "version": null}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	result, err := client.ListPages(context.Background(), "123456", nil)
+
+	require.NoError(t, err)
+	assert.Len(t, result.Results, 1)
+	assert.Nil(t, result.Results[0].Version)
+}
+
+func TestClient_ListPages_NullBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"results": [
+				{"id": "123", "title": "Test Page", "status": "current", "body": null}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	result, err := client.ListPages(context.Background(), "123456", nil)
+
+	require.NoError(t, err)
+	assert.Len(t, result.Results, 1)
+	assert.Nil(t, result.Results[0].Body)
+}
+
+func TestClient_ListPages_MissingOptionalFields(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// Minimal page response
+		_, _ = w.Write([]byte(`{
+			"results": [
+				{"id": "123", "title": "Minimal Page", "status": "current"}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	result, err := client.ListPages(context.Background(), "123456", nil)
+
+	require.NoError(t, err)
+	assert.Len(t, result.Results, 1)
+	assert.Equal(t, "Minimal Page", result.Results[0].Title)
+}
+
+func TestClient_ListPages_MalformedJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{invalid json`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	_, err := client.ListPages(context.Background(), "123456", nil)
+
+	require.Error(t, err)
+}
+
+func TestClient_GetPage_NullBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"id": "123",
+			"title": "Page Without Body",
+			"status": "current",
+			"body": null
+		}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	page, err := client.GetPage(context.Background(), "123", nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, "Page Without Body", page.Title)
+	assert.Nil(t, page.Body)
+}
+
+func TestClient_GetPage_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message": "Page not found"}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	_, err := client.GetPage(context.Background(), "nonexistent", nil)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Page not found")
+}

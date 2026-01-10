@@ -107,3 +107,86 @@ func TestClient_GetSpace_NotFound(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Space not found")
 }
+
+// Edge case tests
+
+func TestClient_ListSpaces_EmptyResults(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"results": []}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	result, err := client.ListSpaces(context.Background(), nil)
+
+	require.NoError(t, err)
+	assert.Len(t, result.Results, 0)
+	assert.False(t, result.HasMore())
+}
+
+func TestClient_ListSpaces_NullDescription(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"results": [
+				{"id": "123", "key": "TEST", "name": "Test", "type": "global", "description": null}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	result, err := client.ListSpaces(context.Background(), nil)
+
+	require.NoError(t, err)
+	assert.Len(t, result.Results, 1)
+	assert.Nil(t, result.Results[0].Description)
+}
+
+func TestClient_ListSpaces_MissingOptionalFields(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// Minimal response with only required fields
+		_, _ = w.Write([]byte(`{
+			"results": [
+				{"id": "123", "key": "TEST", "name": "Test", "type": "global"}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	result, err := client.ListSpaces(context.Background(), nil)
+
+	require.NoError(t, err)
+	assert.Len(t, result.Results, 1)
+	assert.Equal(t, "TEST", result.Results[0].Key)
+}
+
+func TestClient_ListSpaces_MalformedJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{invalid json`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	_, err := client.ListSpaces(context.Background(), nil)
+
+	require.Error(t, err)
+}
+
+func TestClient_GetSpaceByKey_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"results": []}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	_, err := client.GetSpaceByKey(context.Background(), "NONEXISTENT")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+}
