@@ -6,9 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rianjs/confluence-cli/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/rianjs/confluence-cli/api"
 )
 
 // mockAttachmentServer creates a test server that handles attachment get and delete
