@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -68,7 +69,11 @@ func runDownload(attachmentID string, opts *downloadOptions) error {
 	// Determine output filename
 	outputPath := opts.outputFile
 	if outputPath == "" {
-		outputPath = attachment.Title
+		// Sanitize filename to prevent path traversal attacks
+		outputPath = filepath.Base(attachment.Title)
+		if outputPath == "" || outputPath == "." || outputPath == ".." {
+			return fmt.Errorf("invalid attachment filename: %q", attachment.Title)
+		}
 	}
 
 	// Download the attachment
