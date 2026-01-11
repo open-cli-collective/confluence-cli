@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/rianjs/confluence-cli/compare/v0.2.4...v0.2.5) (2026-01-11)
+
+
+### Bug Fixes
+
+* preserve tables in HTML to markdown conversion ([#26](https://github.com/rianjs/confluence-cli/issues/26)) ([56340da](https://github.com/rianjs/confluence-cli/commit/56340da499dd0e73cdba6cd4b71ba32e5860d989))
+
 ## [0.2.4](https://github.com/rianjs/confluence-cli/compare/v0.2.3...v0.2.4) (2026-01-11)
 
 
