@@ -3,6 +3,7 @@ package attachment
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -14,6 +15,7 @@ import (
 type listOptions struct {
 	pageID  string
 	limit   int
+	unused  bool
 	output  string
 	noColor bool
 }
@@ -31,7 +33,10 @@ func NewCmdList() *cobra.Command {
   cfl attachment list --page 12345
 
   # List with custom limit
-  cfl attachment list --page 12345 --limit 50`,
+  cfl attachment list --page 12345 --limit 50
+
+  # List unused (orphaned) attachments not referenced in page content
+  cfl attachment list --page 12345 --unused`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			opts.output, _ = cmd.Flags().GetString("output")
 			opts.noColor, _ = cmd.Flags().GetBool("no-color")
@@ -41,6 +46,7 @@ func NewCmdList() *cobra.Command {
 
 	cmd.Flags().StringVarP(&opts.pageID, "page", "p", "", "Page ID (required)")
 	cmd.Flags().IntVarP(&opts.limit, "limit", "l", 25, "Maximum number of attachments to return")
+	cmd.Flags().BoolVar(&opts.unused, "unused", false, "Show only attachments not referenced in page content")
 
 	_ = cmd.MarkFlagRequired("page")
 
@@ -77,22 +83,46 @@ func runList(opts *listOptions, client *api.Client) error {
 		return fmt.Errorf("failed to list attachments: %w", err)
 	}
 
+	attachments := result.Results
+
+	// Filter to unused attachments if requested
+	if opts.unused {
+		// Fetch page content in storage format
+		page, err := client.GetPage(context.Background(), opts.pageID, &api.GetPageOptions{
+			BodyFormat: "storage",
+		})
+		if err != nil {
+			return fmt.Errorf("failed to get page content: %w", err)
+		}
+
+		pageContent := ""
+		if page.Body != nil && page.Body.Storage != nil {
+			pageContent = page.Body.Storage.Value
+		}
+
+		attachments = filterUnusedAttachments(attachments, pageContent)
+	}
+
 	// Render output
 	renderer := view.NewRenderer(view.Format(opts.output), opts.noColor)
 
 	if opts.output == "json" {
-		return renderer.RenderJSON(result.Results)
+		return renderer.RenderJSON(attachments)
 	}
 
-	if len(result.Results) == 0 {
-		fmt.Println("No attachments found.")
+	if len(attachments) == 0 {
+		if opts.unused {
+			fmt.Println("No unused attachments found.")
+		} else {
+			fmt.Println("No attachments found.")
+		}
 		return nil
 	}
 
 	// Render as table
 	headers := []string{"ID", "Title", "Media Type", "File Size"}
 	var rows [][]string
-	for _, att := range result.Results {
+	for _, att := range attachments {
 		size := formatFileSize(att.FileSize)
 		rows = append(rows, []string{att.ID, att.Title, att.MediaType, size})
 	}
@@ -100,6 +130,41 @@ func runList(opts *listOptions, client *api.Client) error {
 	renderer.RenderTable(headers, rows)
 
 	return nil
+}
+
+// filterUnusedAttachments returns attachments that are not referenced in the page content.
+// Confluence references attachments in storage format as:
+//   - <ri:attachment ri:filename="example.png"/>
+//   - Attachment filename may also appear in href attributes
+func filterUnusedAttachments(attachments []api.Attachment, pageContent string) []api.Attachment {
+	var unused []api.Attachment
+	for _, att := range attachments {
+		if !isAttachmentReferenced(att.Title, pageContent) {
+			unused = append(unused, att)
+		}
+	}
+	return unused
+}
+
+// isAttachmentReferenced checks if an attachment filename appears in page content.
+func isAttachmentReferenced(filename, content string) bool {
+	// Check for ri:filename="attachment.ext" pattern (most common)
+	if strings.Contains(content, fmt.Sprintf(`ri:filename="%s"`, filename)) {
+		return true
+	}
+
+	// Check for URL-encoded filename in href (e.g., spaces become %20)
+	encodedFilename := strings.ReplaceAll(filename, " ", "%20")
+	if strings.Contains(content, encodedFilename) {
+		return true
+	}
+
+	// Check for plain filename reference (fallback)
+	if strings.Contains(content, filename) {
+		return true
+	}
+
+	return false
 }
 
 func formatFileSize(bytes int64) string {

@@ -95,6 +95,8 @@ This document catalogs the manual integration test suite for `cfl`. These tests 
 | List attachments | `cfl attachment list --page <id>` | Table of attachments with ID, title, type, size |
 | No attachments | List on page with none | "No attachments found" |
 | JSON output | `cfl attachment list --page <id> --output json` | Valid JSON array with full attachment metadata |
+| List unused attachments | `cfl attachment list --page <id> --unused` | Only attachments not referenced in page content |
+| No unused attachments | `--unused` on page using all attachments | "No unused attachments found" |
 
 ### attachment upload
 

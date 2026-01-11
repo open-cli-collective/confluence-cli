@@ -7,8 +7,9 @@ A command-line interface for Atlassian Confluence Cloud, inspired by [jira-cli](
 - Manage Confluence pages from the command line
 - **Markdown-first**: Write and view pages in markdown, auto-converted to/from Confluence format
 - List and browse spaces
-- Create, view, edit, and delete pages
+- Create, view, edit, copy, and delete pages
 - Upload, download, list, and delete attachments
+- Find unused (orphaned) attachments
 - Multiple output formats (table, JSON, plain)
 - Open pages in browser
 
@@ -146,7 +147,7 @@ cfl page list -s DEV -o json
 |------|-------|---------|-------------|
 | `--space` | `-s` | (from config) | Space key (**required** if no default) |
 | `--limit` | `-l` | `25` | Maximum number of pages to return |
-| `--status` | | `current` | Filter by status: `current`, `archived`, `draft` |
+| `--status` | | `current` | Filter by status: `current`, `archived`, `trashed` |
 
 ---
 
@@ -256,6 +257,36 @@ cfl page edit 12345 --title "New Title"
 
 ---
 
+### `cfl page copy <page-id>`
+
+Create a copy of a Confluence page with a new title.
+
+```bash
+# Copy a page with a new title (same space)
+cfl page copy 12345 --title "Copy of My Page"
+
+# Copy to a different space
+cfl page copy 12345 --title "My Page" --space OTHERSPACE
+
+# Copy without attachments (faster for large pages)
+cfl page copy 12345 --title "Lightweight Copy" --no-attachments
+
+# Copy without labels
+cfl page copy 12345 --title "Fresh Copy" --no-labels
+```
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--title` | `-t` | | Title for the copied page (**required**) |
+| `--space` | `-s` | (same as source) | Destination space key |
+| `--no-attachments` | | `false` | Don't copy attachments |
+| `--no-labels` | | `false` | Don't copy labels |
+
+**Arguments:**
+- `<page-id>` - The source page ID (**required**)
+
+---
+
 ### `cfl page delete <page-id>`
 
 Delete a Confluence page.
@@ -284,12 +315,16 @@ List attachments on a page.
 cfl attachment list --page 12345
 cfl attachment list -p 12345 -l 50
 cfl attachment list -p 12345 -o json
+
+# List unused (orphaned) attachments not referenced in page content
+cfl attachment list --page 12345 --unused
 ```
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--page` | `-p` | | Page ID (**required**) |
 | `--limit` | `-l` | `25` | Maximum number of attachments to return |
+| `--unused` | | `false` | Show only attachments not referenced in page content |
 
 ---
 
@@ -317,11 +352,13 @@ Download an attachment.
 ```bash
 cfl attachment download abc123
 cfl attachment download abc123 -O document.pdf
+cfl attachment download abc123 -O existing.pdf --force
 ```
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--output-file` | `-O` | (original filename) | Output file path |
+| `--force` | `-f` | `false` | Overwrite existing file without warning |
 
 **Arguments:**
 - `<attachment-id>` - The attachment ID (**required**)

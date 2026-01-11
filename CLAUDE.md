@@ -112,6 +112,9 @@ type pageAPI interface {
 - Table-driven tests with `t.Run()`
 - Use `github.com/stretchr/testify/assert` and `require`
 
+### Integration Tests
+After significant code changes, run through the manual integration test suite in [integration-tests.md](integration-tests.md). These tests verify real-world behavior against a live Confluence instance and catch edge cases that unit tests miss.
+
 ## Undocumented Constants
 
 | Constant | Value | Location |
