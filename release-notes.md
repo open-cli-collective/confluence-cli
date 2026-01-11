@@ -1,5 +1,14 @@
 # Release Notes
 
+## v0.2.5 (2026-01-11)
+
+Fixes markdown conversion to preserve tables created in Confluence's web UI.
+
+### Changes
+- Preserve tables in HTML to markdown conversion ([#16](https://github.com/rianjs/confluence-cli/issues/16))
+
+---
+
 ## v0.2.4 (2026-01-11)
 
 Fixes markdown conversion to preserve code blocks created in Confluence's web UI.
