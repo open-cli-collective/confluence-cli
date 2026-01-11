@@ -136,14 +136,22 @@ When discovering bugs or planning features:
 1. Create a branch from updated `main`: `git checkout -b fix/issue-description`
 2. Make changes, write tests
 3. Run `make test` to verify
-4. Commit with conventional commit message referencing the issue:
+4. **For new features:** Update README.md with usage examples and flag documentation
+5. Commit with conventional commit message referencing the issue:
    ```
    fix: description of fix
 
    Fixes #123
    ```
-5. Push and create PR referencing the issue in the body
-6. After merge, the issue will auto-close if using "Fixes #N" syntax
+6. Push and create PR referencing the issue in the body
+7. After merge, the issue will auto-close if using "Fixes #N" syntax
+
+### README as Living Documentation
+The README documents the complete CLI surface area. When adding features:
+- Add command examples under the appropriate section
+- Document all flags and options
+- Include practical use cases
+- Keep examples copy-paste ready
 
 ### Conventional Commits
 Use these prefixes for commit messages:
