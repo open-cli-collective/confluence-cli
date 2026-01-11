@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/rianjs/confluence-cli/compare/v0.2.1...v0.2.2) (2026-01-11)
+
+
+### Bug Fixes
+
+* resolve space key from spaceId for page copy ([4b85f2a](https://github.com/rianjs/confluence-cli/commit/4b85f2ab51d9ae7486905e12c701943b5c5c92c1))
+
 ## [0.2.1](https://github.com/rianjs/confluence-cli/compare/v0.2.0...v0.2.1) (2026-01-11)
 
 
