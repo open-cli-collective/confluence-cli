@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/rianjs/confluence-cli/compare/v0.2.5...v0.3.0) (2026-01-11)
+
+
+### Features
+
+* add --unused flag to find orphaned attachments ([#28](https://github.com/rianjs/confluence-cli/issues/28)) ([c7653e5](https://github.com/rianjs/confluence-cli/commit/c7653e510951226a851bb4ff4944b50aec814413))
+
 ## [0.2.5](https://github.com/rianjs/confluence-cli/compare/v0.2.4...v0.2.5) (2026-01-11)
 
 
