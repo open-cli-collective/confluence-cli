@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.1](https://github.com/rianjs/confluence-cli/compare/v0.2.0...v0.2.1) (2026-01-11)
+
+
+### Bug Fixes
+
+* use downloadLink from attachment metadata for downloads ([1621fd8](https://github.com/rianjs/confluence-cli/commit/1621fd885ae451dc2ea8c80f533a3b9c1cd62ee4))
+* use downloadLink from attachment metadata for downloads ([42e3053](https://github.com/rianjs/confluence-cli/commit/42e3053e942ff7e131f6f4aade4bab4906e56d42))
+* use RELEASE_PAT to trigger release workflow ([3a9fd3c](https://github.com/rianjs/confluence-cli/commit/3a9fd3c5791bb2d21a4c75d747f7d8c4d39172ab))
+
 ## [0.2.0](https://github.com/rianjs/confluence-cli/compare/v0.1.1...v0.2.0) (2026-01-10)
 
 
