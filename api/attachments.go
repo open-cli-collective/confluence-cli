@@ -72,47 +72,28 @@ func (c *Client) GetAttachment(ctx context.Context, attachmentID string) (*Attac
 
 // DownloadAttachment downloads an attachment and returns a reader.
 func (c *Client) DownloadAttachment(ctx context.Context, attachmentID string) (io.ReadCloser, error) {
-	// First, get the download URL
-	path := fmt.Sprintf("/api/v2/attachments/%s/download", attachmentID)
-
-	// Create a client that doesn't follow redirects
-	noRedirectClient := &http.Client{
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
+	// Get attachment metadata which includes the download URL
+	att, err := c.GetAttachment(ctx, attachmentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get attachment: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+path, nil)
+	if att.DownloadLink == "" {
+		return nil, fmt.Errorf("attachment has no download link")
+	}
+
+	// downloadLink is relative (e.g., /download/attachments/...)
+	downloadURL := c.baseURL + att.DownloadLink
+
+	req, err := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.SetBasicAuth(c.email, c.apiToken)
 
-	resp, err := noRedirectClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
-	}
-
-	// Handle redirect
-	if resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusTemporaryRedirect {
-		redirectURL := resp.Header.Get("Location")
-		_ = resp.Body.Close()
-
-		// If redirect is relative, make it absolute
-		if redirectURL[0] == '/' {
-			redirectURL = c.baseURL + redirectURL
-		}
-
-		req, err = http.NewRequestWithContext(ctx, "GET", redirectURL, nil)
-		if err != nil {
-			return nil, err
-		}
-		req.SetBasicAuth(c.email, c.apiToken)
-
-		resp, err = c.httpClient.Do(req)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	if resp.StatusCode != http.StatusOK {

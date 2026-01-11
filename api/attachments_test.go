@@ -82,22 +82,29 @@ func TestClient_GetAttachment(t *testing.T) {
 
 func TestClient_DownloadAttachment(t *testing.T) {
 	fileContent := []byte("fake image content")
+	downloadCalled := false
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v2/attachments/att111/download" {
-			// Return redirect
-			w.Header().Set("Location", "/download/attachments/98765/screenshot.png")
-			w.WriteHeader(http.StatusFound)
+		if r.URL.Path == "/api/v2/attachments/att111" {
+			// GetAttachment returns metadata with downloadLink
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+				"id": "att111",
+				"title": "screenshot.png",
+				"downloadLink": "/download/attachments/98765/screenshot.png"
+			}`))
 			return
 		}
 
 		if r.URL.Path == "/download/attachments/98765/screenshot.png" {
+			downloadCalled = true
 			w.Header().Set("Content-Type", "image/png")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write(fileContent)
 			return
 		}
 
+		t.Errorf("unexpected request path: %s", r.URL.Path)
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer server.Close()
@@ -107,10 +114,25 @@ func TestClient_DownloadAttachment(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = reader.Close() }()
 
+	assert.True(t, downloadCalled, "should have called download link")
+
 	// Read and verify content
 	buf := make([]byte, 100)
 	n, _ := reader.Read(buf)
 	assert.Equal(t, fileContent, buf[:n])
+}
+
+func TestClient_DownloadAttachment_NoDownloadLink(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id": "att123", "title": "test.txt"}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "user@example.com", "token")
+	_, err := client.DownloadAttachment(context.Background(), "att123")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no download link")
 }
 
 func TestClient_DeleteAttachment(t *testing.T) {
