@@ -232,8 +232,8 @@ func TestRunList_UnusedFlag(t *testing.T) {
 	requestCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
-		switch {
-		case r.URL.Path == "/api/v2/pages/12345/attachments":
+		switch r.URL.Path {
+		case "/api/v2/pages/12345/attachments":
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{
 				"results": [
@@ -241,7 +241,7 @@ func TestRunList_UnusedFlag(t *testing.T) {
 					{"id": "att2", "title": "unused.pdf", "mediaType": "application/pdf", "fileSize": 2048}
 				]
 			}`))
-		case r.URL.Path == "/api/v2/pages/12345":
+		case "/api/v2/pages/12345":
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{
 				"id": "12345",
@@ -274,15 +274,15 @@ func TestRunList_UnusedFlag(t *testing.T) {
 
 func TestRunList_UnusedFlag_NoUnused(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/api/v2/pages/12345/attachments":
+		switch r.URL.Path {
+		case "/api/v2/pages/12345/attachments":
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{
 				"results": [
 					{"id": "att1", "title": "used.png", "mediaType": "image/png", "fileSize": 1024}
 				]
 			}`))
-		case r.URL.Path == "/api/v2/pages/12345":
+		case "/api/v2/pages/12345":
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{
 				"id": "12345",
