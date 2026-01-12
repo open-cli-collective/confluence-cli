@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/rianjs/confluence-cli/compare/v0.3.2...v0.4.0) (2026-01-12)
+
+
+### Features
+
+* add Confluence search with CQL support ([#37](https://github.com/rianjs/confluence-cli/issues/37)) ([bda490c](https://github.com/rianjs/confluence-cli/commit/bda490c9287698fa71ca13a0f6d5789607557526)), closes [#36](https://github.com/rianjs/confluence-cli/issues/36)
+
 ## [0.3.2](https://github.com/rianjs/confluence-cli/compare/v0.3.1...v0.3.2) (2026-01-12)
 
 
