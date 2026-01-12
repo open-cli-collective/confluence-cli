@@ -133,6 +133,105 @@ func TestRenderer_RenderTable_Plain(t *testing.T) {
 	assert.Contains(t, lines[1], "2\tSecond")
 }
 
+func TestRenderer_RenderList_JSON_HasMore(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRenderer(FormatJSON, true)
+	r.SetWriter(&buf)
+
+	headers := []string{"ID", "Name"}
+	rows := [][]string{
+		{"1", "First"},
+		{"2", "Second"},
+	}
+
+	r.RenderList(headers, rows, true) // hasMore=true
+
+	var result ListResponse
+	err := json.Unmarshal(buf.Bytes(), &result)
+	require.NoError(t, err)
+
+	assert.Len(t, result.Results, 2)
+	assert.Equal(t, "1", result.Results[0]["id"])
+	assert.Equal(t, "First", result.Results[0]["name"])
+	assert.Equal(t, 2, result.Meta.Count)
+	assert.True(t, result.Meta.HasMore)
+}
+
+func TestRenderer_RenderList_JSON_NoMore(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRenderer(FormatJSON, true)
+	r.SetWriter(&buf)
+
+	headers := []string{"ID", "Name"}
+	rows := [][]string{{"1", "Only"}}
+
+	r.RenderList(headers, rows, false) // hasMore=false
+
+	var result ListResponse
+	err := json.Unmarshal(buf.Bytes(), &result)
+	require.NoError(t, err)
+
+	assert.Len(t, result.Results, 1)
+	assert.Equal(t, 1, result.Meta.Count)
+	assert.False(t, result.Meta.HasMore)
+}
+
+func TestRenderer_RenderList_JSON_Empty(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRenderer(FormatJSON, true)
+	r.SetWriter(&buf)
+
+	headers := []string{"ID", "Name"}
+	rows := [][]string{}
+
+	r.RenderList(headers, rows, false)
+
+	var result ListResponse
+	err := json.Unmarshal(buf.Bytes(), &result)
+	require.NoError(t, err)
+
+	assert.Len(t, result.Results, 0)
+	assert.Equal(t, 0, result.Meta.Count)
+	assert.False(t, result.Meta.HasMore)
+}
+
+func TestRenderer_RenderList_Table(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRenderer(FormatTable, true)
+	r.SetWriter(&buf)
+
+	headers := []string{"ID", "Name"}
+	rows := [][]string{{"1", "First"}}
+
+	r.RenderList(headers, rows, true)
+
+	output := buf.String()
+	// Table format should NOT contain _meta
+	assert.NotContains(t, output, "_meta")
+	assert.NotContains(t, output, "hasMore")
+	// Should contain table data
+	assert.Contains(t, output, "ID")
+	assert.Contains(t, output, "Name")
+	assert.Contains(t, output, "First")
+}
+
+func TestRenderer_RenderList_Plain(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRenderer(FormatPlain, true)
+	r.SetWriter(&buf)
+
+	headers := []string{"ID", "Name"}
+	rows := [][]string{{"1", "First"}}
+
+	r.RenderList(headers, rows, true)
+
+	output := buf.String()
+	// Plain format should NOT contain _meta
+	assert.NotContains(t, output, "_meta")
+	// Should contain tab-separated data
+	assert.Contains(t, output, "1\tFirst")
+}
+
 func TestRenderer_RenderJSON(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(FormatJSON, true)
