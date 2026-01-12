@@ -119,9 +119,9 @@ func runList(opts *listOptions, client *api.Client) error {
 		})
 	}
 
-	renderer.RenderTable(headers, rows)
+	renderer.RenderList(headers, rows, result.HasMore())
 
-	if result.HasMore() {
+	if result.HasMore() && opts.output != "json" {
 		fmt.Fprintf(os.Stderr, "\n(showing first %d results, use --limit to see more)\n", len(result.Results))
 	}
 

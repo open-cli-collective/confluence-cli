@@ -3,6 +3,7 @@ package attachment
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -106,11 +107,16 @@ func runList(opts *listOptions, client *api.Client) error {
 	// Render output
 	renderer := view.NewRenderer(view.Format(opts.output), opts.noColor)
 
-	if opts.output == "json" {
-		return renderer.RenderJSON(attachments)
+	// Build table rows
+	headers := []string{"ID", "Title", "Media Type", "File Size"}
+	var rows [][]string
+	for _, att := range attachments {
+		size := formatFileSize(att.FileSize)
+		rows = append(rows, []string{att.ID, att.Title, att.MediaType, size})
 	}
 
-	if len(attachments) == 0 {
+	// Handle empty result for non-JSON output
+	if len(attachments) == 0 && opts.output != "json" {
 		if opts.unused {
 			fmt.Println("No unused attachments found.")
 		} else {
@@ -119,15 +125,11 @@ func runList(opts *listOptions, client *api.Client) error {
 		return nil
 	}
 
-	// Render as table
-	headers := []string{"ID", "Title", "Media Type", "File Size"}
-	var rows [][]string
-	for _, att := range attachments {
-		size := formatFileSize(att.FileSize)
-		rows = append(rows, []string{att.ID, att.Title, att.MediaType, size})
-	}
+	renderer.RenderList(headers, rows, result.HasMore())
 
-	renderer.RenderTable(headers, rows)
+	if result.HasMore() && opts.output != "json" {
+		fmt.Fprintf(os.Stderr, "\n(showing first %d results, use --limit to see more)\n", len(attachments))
+	}
 
 	return nil
 }
