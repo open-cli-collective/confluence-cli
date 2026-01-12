@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/rianjs/confluence-cli/compare/v0.3.0...v0.3.1) (2026-01-12)
+
+
+### Bug Fixes
+
+* add _meta field to JSON list output for pagination ([#32](https://github.com/rianjs/confluence-cli/issues/32)) ([0005918](https://github.com/rianjs/confluence-cli/commit/0005918a8b59abaec41099a1c410017d6a78849a))
+
 ## [0.3.0](https://github.com/rianjs/confluence-cli/compare/v0.2.5...v0.3.0) (2026-01-11)
 
 
