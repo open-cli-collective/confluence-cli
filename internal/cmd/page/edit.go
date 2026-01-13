@@ -24,8 +24,10 @@ type editOptions struct {
 	file     string
 	editor   bool
 	markdown *bool // nil = auto-detect, true = force markdown, false = force storage format
+	legacy   bool  // Use legacy editor (storage format) instead of cloud editor (ADF)
 	output   string
 	noColor  bool
+	stdin    io.Reader // For testing; defaults to os.Stdin
 }
 
 // NewCmdEdit creates the page edit command.
@@ -37,6 +39,9 @@ func NewCmdEdit() *cobra.Command {
 		Short: "Edit an existing page",
 		Long: `Edit an existing Confluence page.
 
+By default, pages are updated using the cloud editor format (ADF).
+Use --legacy to update pages in the legacy editor format.
+
 Content can be provided via:
 - --file flag to read from a file
 - Standard input (pipe content)
@@ -44,13 +49,16 @@ Content can be provided via:
 
 Content format:
 - Markdown is the default for stdin, editor, and .md files
-- Use --no-markdown to provide Confluence storage format (XHTML)
+- Use --no-markdown to provide raw Confluence format (XHTML for legacy, ADF JSON for cloud)
 - Files with .html/.xhtml extensions are treated as storage format`,
 		Example: `  # Edit a page (opens editor with current content)
   cfl page edit 12345
 
   # Update page content from file
   cfl page edit 12345 --file content.md
+
+  # Update page in legacy format
+  cfl page edit 12345 --file content.md --legacy
 
   # Update page content from stdin
   echo "# Updated Content" | cfl page edit 12345
@@ -70,6 +78,9 @@ Content format:
 				opts.markdown = &useMd
 			}
 
+			// Handle legacy flag
+			opts.legacy, _ = cmd.Flags().GetBool("legacy")
+
 			return runEdit(opts, nil)
 		},
 	}
@@ -78,6 +89,7 @@ Content format:
 	cmd.Flags().StringVarP(&opts.file, "file", "f", "", "Read content from file")
 	cmd.Flags().BoolVar(&opts.editor, "editor", false, "Open editor for content")
 	cmd.Flags().Bool("no-markdown", false, "Disable markdown conversion (use raw XHTML)")
+	cmd.Flags().Bool("legacy", false, "Edit page in legacy editor format (default: cloud editor)")
 
 	return cmd
 }
@@ -119,22 +131,17 @@ func runEdit(opts *editOptions, client *api.Client) error {
 	var newContent string
 	hasNewContent := false
 
-	// Check if content is provided via file or stdin
-	if opts.file != "" || opts.editor || !isTerminal() {
+	// Check if content is provided via file, stdin, or editor flag
+	if opts.file != "" || opts.editor || opts.stdin != nil || !isTerminal() {
 		content, isMarkdown, err := getEditContent(opts, existingPage)
 		if err != nil {
 			return err
 		}
 
-		// Convert markdown to storage format if needed
-		if isMarkdown {
-			converted, err := md.ToConfluenceStorage([]byte(content))
-			if err != nil {
-				return fmt.Errorf("failed to convert markdown: %w", err)
-			}
-			newContent = converted
-		} else {
-			newContent = content
+		// Convert content based on legacy flag
+		newContent, err = convertEditContent(content, isMarkdown, opts.legacy)
+		if err != nil {
+			return err
 		}
 		hasNewContent = true
 	}
@@ -146,14 +153,9 @@ func runEdit(opts *editOptions, client *api.Client) error {
 			return err
 		}
 
-		if isMarkdown {
-			converted, err := md.ToConfluenceStorage([]byte(content))
-			if err != nil {
-				return fmt.Errorf("failed to convert markdown: %w", err)
-			}
-			newContent = converted
-		} else {
-			newContent = content
+		newContent, err = convertEditContent(content, isMarkdown, opts.legacy)
+		if err != nil {
+			return err
 		}
 		hasNewContent = true
 	}
@@ -171,11 +173,24 @@ func runEdit(opts *editOptions, client *api.Client) error {
 
 	// Only update body if we have new content
 	if hasNewContent {
-		req.Body = &api.Body{
-			Storage: &api.BodyRepresentation{
-				Representation: "storage",
-				Value:          newContent,
-			},
+		if opts.legacy {
+			// Warn about potential editor switch
+			renderer := view.NewRenderer(view.Format(opts.output), opts.noColor)
+			renderer.Warning("Using --legacy flag. If this page uses the cloud editor, it may switch to the legacy editor.")
+
+			req.Body = &api.Body{
+				Storage: &api.BodyRepresentation{
+					Representation: "storage",
+					Value:          newContent,
+				},
+			}
+		} else {
+			req.Body = &api.Body{
+				AtlasDocFormat: &api.BodyRepresentation{
+					Representation: "atlas_doc_format",
+					Value:          newContent,
+				},
+			}
 		}
 	} else {
 		// Keep existing body when only updating title
@@ -209,6 +224,31 @@ func isTerminal() bool {
 	return (stat.Mode() & os.ModeCharDevice) != 0
 }
 
+// convertEditContent converts content based on markdown flag and legacy mode.
+func convertEditContent(content string, isMarkdown, legacy bool) (string, error) {
+	if legacy {
+		// Legacy mode: convert to storage format (XHTML)
+		if isMarkdown {
+			converted, err := md.ToConfluenceStorage([]byte(content))
+			if err != nil {
+				return "", fmt.Errorf("failed to convert markdown: %w", err)
+			}
+			return converted, nil
+		}
+		return content, nil
+	}
+
+	// Default: cloud editor using ADF
+	if isMarkdown {
+		adfContent, err := md.ToADF([]byte(content))
+		if err != nil {
+			return "", fmt.Errorf("failed to convert markdown to ADF: %w", err)
+		}
+		return adfContent, nil
+	}
+	return content, nil
+}
+
 // getEditContent reads content for editing and returns (content, isMarkdown, error).
 func getEditContent(opts *editOptions, existingPage *api.Page) (string, bool, error) {
 	// Determine if we should use markdown based on explicit flag or file extension
@@ -240,7 +280,15 @@ func getEditContent(opts *editOptions, existingPage *api.Page) (string, bool, er
 		return string(data), useMarkdown(opts.file), nil
 	}
 
-	// Check if stdin has data
+	// Check if stdin has data (use injected stdin for testing)
+	if opts.stdin != nil {
+		data, err := io.ReadAll(opts.stdin)
+		if err != nil {
+			return "", false, fmt.Errorf("failed to read stdin: %w", err)
+		}
+		return string(data), useMarkdown(""), nil
+	}
+
 	if !isTerminal() {
 		data, err := io.ReadAll(os.Stdin)
 		if err != nil {

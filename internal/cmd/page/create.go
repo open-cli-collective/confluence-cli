@@ -24,8 +24,10 @@ type createOptions struct {
 	file     string
 	editor   bool
 	markdown *bool // nil = auto-detect, true = force markdown, false = force storage format
+	legacy   bool  // Use legacy editor (storage format) instead of cloud editor (ADF)
 	output   string
 	noColor  bool
+	stdin    io.Reader // For testing; defaults to os.Stdin
 }
 
 // NewCmdCreate creates the page create command.
@@ -37,6 +39,9 @@ func NewCmdCreate() *cobra.Command {
 		Short: "Create a new page",
 		Long: `Create a new Confluence page.
 
+By default, pages are created using the cloud editor format (ADF).
+Use --legacy to create pages in the legacy editor format.
+
 Content can be provided via:
 - --file flag to read from a file
 - Standard input (pipe content)
@@ -44,22 +49,25 @@ Content can be provided via:
 
 Content format:
 - Markdown is the default for stdin, editor, and .md files
-- Use --no-markdown to provide Confluence storage format (XHTML)
+- Use --no-markdown to provide raw Confluence format (XHTML for legacy, ADF JSON for cloud)
 - Files with .html/.xhtml extensions are treated as storage format`,
-		Example: `  # Create a page with title (opens markdown editor)
+		Example: `  # Create a page with title (opens markdown editor, cloud editor format)
   cfl page create --space DEV --title "My Page"
 
   # Create from markdown file
   cfl page create -s DEV -t "My Page" --file content.md
 
-  # Create from XHTML file
-  cfl page create -s DEV -t "My Page" --file content.html
+  # Create in legacy editor format
+  cfl page create -s DEV -t "My Page" --file content.md --legacy
+
+  # Create from XHTML file (legacy mode)
+  cfl page create -s DEV -t "My Page" --file content.html --legacy
 
   # Create from stdin (markdown)
   echo "# Hello World" | cfl page create -s DEV -t "My Page"
 
-  # Create from stdin (XHTML)
-  echo "<p>Hello</p>" | cfl page create -s DEV -t "My Page" --no-markdown
+  # Create from stdin with legacy format (XHTML)
+  echo "<p>Hello</p>" | cfl page create -s DEV -t "My Page" --no-markdown --legacy
 
   # Create as child of another page
   cfl page create -s DEV -t "Child Page" --parent 12345`,
@@ -74,6 +82,9 @@ Content format:
 				opts.markdown = &useMd
 			}
 
+			// Handle legacy flag
+			opts.legacy, _ = cmd.Flags().GetBool("legacy")
+
 			return runCreate(opts, nil)
 		},
 	}
@@ -84,6 +95,7 @@ Content format:
 	cmd.Flags().StringVarP(&opts.file, "file", "f", "", "Read content from file")
 	cmd.Flags().BoolVar(&opts.editor, "editor", false, "Open editor for content")
 	cmd.Flags().Bool("no-markdown", false, "Disable markdown conversion (use raw XHTML)")
+	cmd.Flags().Bool("legacy", false, "Create page in legacy editor format (default: cloud editor)")
 
 	_ = cmd.MarkFlagRequired("title")
 
@@ -133,13 +145,39 @@ func runCreate(opts *createOptions, client *api.Client) error {
 		return err
 	}
 
-	// Convert markdown to storage format if needed
-	if isMarkdown {
-		converted, err := md.ToConfluenceStorage([]byte(content))
-		if err != nil {
-			return fmt.Errorf("failed to convert markdown: %w", err)
+	// Build request body based on legacy flag
+	var body *api.Body
+
+	if opts.legacy {
+		// Legacy mode: use storage format (XHTML)
+		if isMarkdown {
+			converted, err := md.ToConfluenceStorage([]byte(content))
+			if err != nil {
+				return fmt.Errorf("failed to convert markdown: %w", err)
+			}
+			content = converted
 		}
-		content = converted
+		body = &api.Body{
+			Storage: &api.BodyRepresentation{
+				Representation: "storage",
+				Value:          content,
+			},
+		}
+	} else {
+		// Default: cloud editor using ADF
+		if isMarkdown {
+			adfContent, err := md.ToADF([]byte(content))
+			if err != nil {
+				return fmt.Errorf("failed to convert markdown to ADF: %w", err)
+			}
+			content = adfContent
+		}
+		body = &api.Body{
+			AtlasDocFormat: &api.BodyRepresentation{
+				Representation: "atlas_doc_format",
+				Value:          content,
+			},
+		}
 	}
 
 	// Create page
@@ -147,12 +185,7 @@ func runCreate(opts *createOptions, client *api.Client) error {
 		SpaceID: space.ID,
 		Title:   opts.title,
 		Status:  "current",
-		Body: &api.Body{
-			Storage: &api.BodyRepresentation{
-				Representation: "storage",
-				Value:          content,
-			},
-		},
+		Body:    body,
 	}
 
 	if opts.parent != "" {
@@ -210,7 +243,15 @@ func getContent(opts *createOptions) (string, bool, error) {
 		return string(data), useMarkdown(opts.file), nil
 	}
 
-	// Check if stdin has data
+	// Check if stdin has data (use injected stdin for testing)
+	if opts.stdin != nil {
+		data, err := io.ReadAll(opts.stdin)
+		if err != nil {
+			return "", false, fmt.Errorf("failed to read stdin: %w", err)
+		}
+		return string(data), useMarkdown(""), nil
+	}
+
 	stat, _ := os.Stdin.Stat()
 	if (stat.Mode() & os.ModeCharDevice) == 0 {
 		data, err := io.ReadAll(os.Stdin)
