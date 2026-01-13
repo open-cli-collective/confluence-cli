@@ -1,5 +1,25 @@
 # Release Notes
 
+## v0.5.0 (2026-01-13)
+
+Pages now use the modern cloud editor (ADF) format by default.
+
+### Features
+- Use cloud editor (ADF) format for page creation by default ([#39](https://github.com/rianjs/confluence-cli/issues/39))
+- Add `--legacy` flag to create/edit pages in legacy storage format
+- Add format mismatch warning when editing cloud pages with `--legacy`
+
+---
+
+## v0.4.0 (2026-01-12)
+
+Adds Confluence search with CQL query support.
+
+### Features
+- Add `cfl search` command with full-text search, space/type filters, and raw CQL support ([#36](https://github.com/rianjs/confluence-cli/issues/36))
+
+---
+
 ## v0.3.2 (2026-01-12)
 
 Fixes markdown table conversion when creating pages.
