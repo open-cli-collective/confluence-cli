@@ -208,6 +208,12 @@ func (r *Renderer) Error(msg string) {
 	_, _ = red.Fprintln(r.writer, "✗ "+msg)
 }
 
+// Warning prints a warning message.
+func (r *Renderer) Warning(msg string) {
+	yellow := color.New(color.FgYellow)
+	_, _ = yellow.Fprintln(r.writer, "⚠ "+msg)
+}
+
 // Truncate truncates a string to the specified length.
 func Truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {

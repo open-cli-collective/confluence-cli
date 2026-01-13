@@ -318,8 +318,8 @@ func (c *adfConverter) convertTableCell(n *extast.TableCell, isHeader bool) *ADF
 	}
 
 	return &ADFNode{
-		Type:  cellType,
-		Attrs: map[string]interface{}{"colspan": 1, "rowspan": 1},
+		Type:    cellType,
+		Attrs:   map[string]interface{}{"colspan": 1, "rowspan": 1},
 		Content: []*ADFNode{para},
 	}
 }
@@ -382,7 +382,14 @@ func (c *adfConverter) convertInlineNode(n ast.Node, marks []*ADFMark) []*ADFNod
 		return nodes
 
 	case *ast.CodeSpan:
-		text := string(node.Text(c.source))
+		// Build text from child text nodes
+		var textBuilder strings.Builder
+		for child := node.FirstChild(); child != nil; child = child.NextSibling() {
+			if textNode, ok := child.(*ast.Text); ok {
+				textBuilder.Write(textNode.Segment.Value(c.source))
+			}
+		}
+		text := textBuilder.String()
 		newMarks := append(copyMarks(marks), &ADFMark{Type: "code"})
 		return []*ADFNode{{Type: "text", Text: text, Marks: newMarks}}
 
@@ -413,7 +420,14 @@ func (c *adfConverter) convertInlineNode(n ast.Node, marks []*ADFMark) []*ADFNod
 
 	case *ast.Image:
 		// Images would need special handling - for now return alt text
-		alt := string(node.Text(c.source))
+		// Build alt text from child text nodes (node.Text is deprecated)
+		var altBuilder strings.Builder
+		for child := node.FirstChild(); child != nil; child = child.NextSibling() {
+			if textNode, ok := child.(*ast.Text); ok {
+				altBuilder.Write(textNode.Segment.Value(c.source))
+			}
+		}
+		alt := altBuilder.String()
 		if alt == "" {
 			alt = string(node.Destination)
 		}

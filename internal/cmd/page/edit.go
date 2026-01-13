@@ -27,6 +27,7 @@ type editOptions struct {
 	legacy   bool  // Use legacy editor (storage format) instead of cloud editor (ADF)
 	output   string
 	noColor  bool
+	stdin    io.Reader // For testing; defaults to os.Stdin
 }
 
 // NewCmdEdit creates the page edit command.
@@ -130,8 +131,8 @@ func runEdit(opts *editOptions, client *api.Client) error {
 	var newContent string
 	hasNewContent := false
 
-	// Check if content is provided via file or stdin
-	if opts.file != "" || opts.editor || !isTerminal() {
+	// Check if content is provided via file, stdin, or editor flag
+	if opts.file != "" || opts.editor || opts.stdin != nil || !isTerminal() {
 		content, isMarkdown, err := getEditContent(opts, existingPage)
 		if err != nil {
 			return err
@@ -173,6 +174,10 @@ func runEdit(opts *editOptions, client *api.Client) error {
 	// Only update body if we have new content
 	if hasNewContent {
 		if opts.legacy {
+			// Warn about potential editor switch
+			renderer := view.NewRenderer(view.Format(opts.output), opts.noColor)
+			renderer.Warning("Using --legacy flag. If this page uses the cloud editor, it may switch to the legacy editor.")
+
 			req.Body = &api.Body{
 				Storage: &api.BodyRepresentation{
 					Representation: "storage",
@@ -275,7 +280,15 @@ func getEditContent(opts *editOptions, existingPage *api.Page) (string, bool, er
 		return string(data), useMarkdown(opts.file), nil
 	}
 
-	// Check if stdin has data
+	// Check if stdin has data (use injected stdin for testing)
+	if opts.stdin != nil {
+		data, err := io.ReadAll(opts.stdin)
+		if err != nil {
+			return "", false, fmt.Errorf("failed to read stdin: %w", err)
+		}
+		return string(data), useMarkdown(""), nil
+	}
+
 	if !isTerminal() {
 		data, err := io.ReadAll(os.Stdin)
 		if err != nil {

@@ -391,3 +391,173 @@ func TestRunCreate_FileReadError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to read file")
 }
+
+func TestRunCreate_Stdin_ADF(t *testing.T) {
+	var receivedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/spaces"):
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"results": [{"id": "123456", "key": "DEV"}]}`))
+		case r.Method == "POST" && strings.Contains(r.URL.Path, "/pages"):
+			body, _ := io.ReadAll(r.Body)
+			json.Unmarshal(body, &receivedBody)
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"id": "99999", "title": "Test", "version": {"number": 1}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test@example.com", "token")
+	opts := &createOptions{
+		space:   "DEV",
+		title:   "Test Page",
+		stdin:   strings.NewReader("# Hello\n\nThis is **bold** text."),
+		noColor: true,
+	}
+
+	err := runCreate(opts, client)
+	require.NoError(t, err)
+
+	// Verify ADF format was used
+	bodyMap := receivedBody["body"].(map[string]interface{})
+	adfMap := bodyMap["atlas_doc_format"].(map[string]interface{})
+	content := adfMap["value"].(string)
+
+	assert.Contains(t, content, `"type":"doc"`)
+	assert.Contains(t, content, `"type":"heading"`)
+	assert.Contains(t, content, `"type":"strong"`)
+}
+
+func TestRunCreate_Stdin_Legacy(t *testing.T) {
+	var receivedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/spaces"):
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"results": [{"id": "123456", "key": "DEV"}]}`))
+		case r.Method == "POST" && strings.Contains(r.URL.Path, "/pages"):
+			body, _ := io.ReadAll(r.Body)
+			json.Unmarshal(body, &receivedBody)
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"id": "99999", "title": "Test", "version": {"number": 1}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test@example.com", "token")
+	opts := &createOptions{
+		space:   "DEV",
+		title:   "Test Page",
+		stdin:   strings.NewReader("# Hello\n\nThis is **bold** text."),
+		legacy:  true,
+		noColor: true,
+	}
+
+	err := runCreate(opts, client)
+	require.NoError(t, err)
+
+	// Verify storage format was used
+	bodyMap := receivedBody["body"].(map[string]interface{})
+	storageMap := bodyMap["storage"].(map[string]interface{})
+	content := storageMap["value"].(string)
+
+	assert.Contains(t, content, "<h1")
+	assert.Contains(t, content, "<strong>bold</strong>")
+}
+
+func TestRunCreate_Stdin_NoMarkdown_Legacy(t *testing.T) {
+	var receivedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/spaces"):
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"results": [{"id": "123456", "key": "DEV"}]}`))
+		case r.Method == "POST" && strings.Contains(r.URL.Path, "/pages"):
+			body, _ := io.ReadAll(r.Body)
+			json.Unmarshal(body, &receivedBody)
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"id": "99999", "title": "Test", "version": {"number": 1}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test@example.com", "token")
+	useMd := false
+	opts := &createOptions{
+		space:    "DEV",
+		title:    "Test Page",
+		stdin:    strings.NewReader("<p>Raw XHTML content</p>"),
+		markdown: &useMd,
+		legacy:   true,
+		noColor:  true,
+	}
+
+	err := runCreate(opts, client)
+	require.NoError(t, err)
+
+	// Verify raw content passed through without conversion
+	bodyMap := receivedBody["body"].(map[string]interface{})
+	storageMap := bodyMap["storage"].(map[string]interface{})
+	content := storageMap["value"].(string)
+
+	assert.Equal(t, "<p>Raw XHTML content</p>", content)
+}
+
+func TestRunCreate_ComplexMarkdown_ADF(t *testing.T) {
+	var receivedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/spaces"):
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"results": [{"id": "123456", "key": "DEV"}]}`))
+		case r.Method == "POST" && strings.Contains(r.URL.Path, "/pages"):
+			body, _ := io.ReadAll(r.Body)
+			json.Unmarshal(body, &receivedBody)
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"id": "99999", "title": "Test", "version": {"number": 1}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	complexMarkdown := `# Title
+
+| Header 1 | Header 2 |
+|----------|----------|
+| Cell 1   | Cell 2   |
+
+- Item 1
+  - Nested item
+- Item 2
+
+` + "```go\nfunc main() {\n    fmt.Println(\"Hello\")\n}\n```"
+
+	client := api.NewClient(server.URL, "test@example.com", "token")
+	opts := &createOptions{
+		space:   "DEV",
+		title:   "Test Page",
+		stdin:   strings.NewReader(complexMarkdown),
+		noColor: true,
+	}
+
+	err := runCreate(opts, client)
+	require.NoError(t, err)
+
+	// Verify ADF contains complex elements
+	bodyMap := receivedBody["body"].(map[string]interface{})
+	adfMap := bodyMap["atlas_doc_format"].(map[string]interface{})
+	content := adfMap["value"].(string)
+
+	assert.Contains(t, content, `"type":"table"`)
+	assert.Contains(t, content, `"type":"bulletList"`)
+	assert.Contains(t, content, `"type":"codeBlock"`)
+	assert.Contains(t, content, `"language":"go"`)
+}

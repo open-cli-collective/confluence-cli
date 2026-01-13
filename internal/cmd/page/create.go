@@ -27,6 +27,7 @@ type createOptions struct {
 	legacy   bool  // Use legacy editor (storage format) instead of cloud editor (ADF)
 	output   string
 	noColor  bool
+	stdin    io.Reader // For testing; defaults to os.Stdin
 }
 
 // NewCmdCreate creates the page create command.
@@ -242,7 +243,15 @@ func getContent(opts *createOptions) (string, bool, error) {
 		return string(data), useMarkdown(opts.file), nil
 	}
 
-	// Check if stdin has data
+	// Check if stdin has data (use injected stdin for testing)
+	if opts.stdin != nil {
+		data, err := io.ReadAll(opts.stdin)
+		if err != nil {
+			return "", false, fmt.Errorf("failed to read stdin: %w", err)
+		}
+		return string(data), useMarkdown(""), nil
+	}
+
 	stat, _ := os.Stdin.Stat()
 	if (stat.Mode() & os.ModeCharDevice) == 0 {
 		data, err := io.ReadAll(os.Stdin)

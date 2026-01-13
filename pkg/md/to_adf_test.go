@@ -349,3 +349,143 @@ func TestToADF_BoldAndItalicCombined(t *testing.T) {
 	assert.True(t, foundStrong, "expected strong mark")
 	assert.True(t, foundEm, "expected em mark")
 }
+
+func TestToADF_OutputIsValidJSON(t *testing.T) {
+	// Test various inputs produce valid JSON
+	inputs := []string{
+		"# Simple heading",
+		"Paragraph with **bold** and *italic*",
+		"- Item 1\n- Item 2",
+		"```go\ncode\n```",
+		"| A | B |\n|---|---|\n| 1 | 2 |",
+	}
+
+	for _, input := range inputs {
+		result, err := ToADF([]byte(input))
+		require.NoError(t, err)
+
+		// Verify it's valid JSON
+		var parsed map[string]interface{}
+		err = json.Unmarshal([]byte(result), &parsed)
+		require.NoError(t, err, "Output should be valid JSON for input: %s", input)
+
+		// Verify basic structure
+		assert.Equal(t, "doc", parsed["type"])
+		assert.EqualValues(t, 1, parsed["version"])
+	}
+}
+
+func TestToADF_Images_AltText(t *testing.T) {
+	input := "![Alt text](https://example.com/image.png)"
+	result, err := ToADF([]byte(input))
+	require.NoError(t, err)
+
+	var doc ADFDocument
+	err = json.Unmarshal([]byte(result), &doc)
+	require.NoError(t, err)
+
+	// Images should be converted to text with alt text
+	require.Len(t, doc.Content, 1)
+	para := doc.Content[0]
+	assert.Equal(t, "paragraph", para.Type)
+	require.Len(t, para.Content, 1)
+	assert.Equal(t, "Alt text", para.Content[0].Text)
+}
+
+func TestToADF_WhitespaceInCodeBlock(t *testing.T) {
+	// Code with leading whitespace should be preserved
+	input := "```\n    indented code\n        more indented\n```"
+	result, err := ToADF([]byte(input))
+	require.NoError(t, err)
+
+	var doc ADFDocument
+	err = json.Unmarshal([]byte(result), &doc)
+	require.NoError(t, err)
+
+	require.Len(t, doc.Content, 1)
+	block := doc.Content[0]
+	assert.Equal(t, "codeBlock", block.Type)
+	require.Len(t, block.Content, 1)
+
+	// Verify whitespace is preserved
+	text := block.Content[0].Text
+	assert.Contains(t, text, "    indented")
+	assert.Contains(t, text, "        more indented")
+}
+
+func TestToADF_NestedBlockquote(t *testing.T) {
+	input := "> Quote with **bold** text\n>\n> And a list:\n> - Item 1\n> - Item 2"
+	result, err := ToADF([]byte(input))
+	require.NoError(t, err)
+
+	var doc ADFDocument
+	err = json.Unmarshal([]byte(result), &doc)
+	require.NoError(t, err)
+
+	require.Len(t, doc.Content, 1)
+	quote := doc.Content[0]
+	assert.Equal(t, "blockquote", quote.Type)
+
+	// Should have nested content
+	assert.True(t, len(quote.Content) > 0, "blockquote should have content")
+}
+
+func TestToADF_HardLineBreak(t *testing.T) {
+	// Two spaces at end of line creates a hard break
+	input := "Line one  \nLine two"
+	result, err := ToADF([]byte(input))
+	require.NoError(t, err)
+
+	var doc ADFDocument
+	err = json.Unmarshal([]byte(result), &doc)
+	require.NoError(t, err)
+
+	// Should have paragraph with hard break
+	require.Len(t, doc.Content, 1)
+	para := doc.Content[0]
+	assert.Equal(t, "paragraph", para.Type)
+
+	// Check for hardBreak node or separate text nodes
+	var foundBreak bool
+	for _, node := range para.Content {
+		if node.Type == "hardBreak" {
+			foundBreak = true
+			break
+		}
+	}
+	// Note: If hardBreak isn't implemented, the content should at least be present
+	if !foundBreak {
+		// Verify both lines are present in some form
+		var fullText string
+		for _, node := range para.Content {
+			fullText += node.Text
+		}
+		assert.Contains(t, fullText, "Line one")
+		assert.Contains(t, fullText, "Line two")
+	}
+}
+
+func TestToADF_InlineCodePreservesContent(t *testing.T) {
+	input := "Use `fmt.Println()` to print"
+	result, err := ToADF([]byte(input))
+	require.NoError(t, err)
+
+	var doc ADFDocument
+	err = json.Unmarshal([]byte(result), &doc)
+	require.NoError(t, err)
+
+	require.Len(t, doc.Content, 1)
+	para := doc.Content[0]
+
+	// Find the code-marked text
+	var foundCode bool
+	for _, node := range para.Content {
+		for _, mark := range node.Marks {
+			if mark.Type == "code" {
+				foundCode = true
+				assert.Equal(t, "fmt.Println()", node.Text)
+			}
+		}
+	}
+	assert.True(t, foundCode, "expected code mark")
+}

@@ -246,20 +246,42 @@ curl -s -u "$EMAIL:$TOKEN" "$URL/api/v2/pages/<page-id>?body-format=atlas_doc_fo
 # Wrong: {"type":"paragraph","content":[{"type":"text","marks":[{"type":"code"}],...}]}
 ```
 
+### Cloud Editor Test Matrix
+
+| Test ID | Input | Flags | Expected Format | Verification |
+|---------|-------|-------|-----------------|--------------|
+| CE-01 | stdin | (none) | ADF | `body.atlas_doc_format` present |
+| CE-02 | stdin | --legacy | storage | `body.storage` present |
+| CE-03 | file.md | (none) | ADF | No "Legacy editor" badge |
+| CE-04 | file.md | --legacy | storage | Shows "Legacy editor" badge |
+| CE-05 | file.html | --legacy | storage | Raw HTML passed through |
+| CE-06 | stdin | --no-markdown | ADF | Raw content passed through |
+| CE-07 | stdin | --no-markdown --legacy | storage | Raw XHTML passed through |
+
+### Round-Trip Tests
+
+| Test ID | Create Format | Edit Format | Expected Result | Notes |
+|---------|---------------|-------------|-----------------|-------|
+| RT-01 | ADF (default) | ADF (default) | ADF preserved | Happy path |
+| RT-02 | --legacy | --legacy | Storage preserved | Legacy happy path |
+| RT-03 | ADF (default) | --legacy | Warning shown, storage used | May switch editor |
+| RT-04 | --legacy | ADF (default) | ADF used | Page stays legacy until manually converted |
+
 ### Test Cases
 
 | Test Case | Steps | Expected Result |
 |-----------|-------|-----------------|
-| Create page (default) | 1. Create page with code block<br>2. Open in browser | No "Legacy editor" badge |
-| Create page (--legacy) | 1. Create page with `--legacy`<br>2. Open in browser | Shows "Legacy editor" badge |
-| Code block preservation | 1. Create page with fenced code block<br>2. Read as ADF | Has `codeBlock` node with language attr |
-| Edit maintains format | 1. Create cloud page<br>2. Edit with `cfl page edit`<br>3. View in browser | Still cloud editor |
-| Edit with --legacy | 1. Create any page<br>2. Edit with `--legacy` flag | Updates use storage format |
+| Create page (default) | 1. `echo "# Test" \| cfl page create -s confluence -t "[Test] Cloud"`<br>2. Open in browser | No "Legacy editor" badge |
+| Create page (--legacy) | 1. `echo "# Test" \| cfl page create -s confluence -t "[Test] Legacy" --legacy`<br>2. Open in browser | Shows "Legacy editor" badge |
+| Code block preservation | 1. Create page with fenced code block<br>2. Read as ADF via API | Has `codeBlock` node with language attr |
+| Edit maintains format | 1. Create cloud page<br>2. `cfl page edit <id> --file updated.md`<br>3. View in browser | Still cloud editor |
+| Edit with --legacy warning | 1. Create cloud page<br>2. `cfl page edit <id> --file updated.md --legacy` | Warning message shown |
+| Complex markdown (ADF) | 1. Create page with tables, code blocks, nested lists<br>2. Read as ADF | All elements preserved as proper ADF nodes |
 
 ### Known Behavior
 
 - **Default (cloud editor)**: Markdown converted to ADF JSON, code blocks properly preserved
-- **--legacy flag**: Markdown converted to XHTML storage format
+- **--legacy flag**: Markdown converted to XHTML storage format, warning shown on edit
 - **Storage→ADF conversion**: Confluence's built-in conversion loses code block structure (converts to paragraph with code mark)
 - **Recommendation**: Use default (cloud editor) for new pages, use `--legacy` only for compatibility with existing legacy pages
 

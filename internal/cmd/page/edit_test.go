@@ -451,3 +451,210 @@ func TestRunEdit_FileReadError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to read file")
 }
+
+func TestRunEdit_Stdin_ADF(t *testing.T) {
+	var receivedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "GET":
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": "12345",
+				"title": "Test",
+				"version": {"number": 1},
+				"body": {"storage": {"value": "<p>Old</p>"}},
+				"_links": {"webui": "/pages/12345"}
+			}`))
+		case "PUT":
+			body, _ := io.ReadAll(r.Body)
+			json.Unmarshal(body, &receivedBody)
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": "12345",
+				"title": "Test",
+				"version": {"number": 2},
+				"_links": {"webui": "/pages/12345"}
+			}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test@example.com", "token")
+	opts := &editOptions{
+		pageID:  "12345",
+		stdin:   strings.NewReader("# Updated\n\nNew **bold** content."),
+		noColor: true,
+	}
+
+	err := runEdit(opts, client)
+	require.NoError(t, err)
+
+	// Verify ADF format was used
+	bodyMap := receivedBody["body"].(map[string]interface{})
+	adfMap := bodyMap["atlas_doc_format"].(map[string]interface{})
+	content := adfMap["value"].(string)
+
+	assert.Contains(t, content, `"type":"doc"`)
+	assert.Contains(t, content, `"type":"heading"`)
+	assert.Contains(t, content, `"type":"strong"`)
+}
+
+func TestRunEdit_Stdin_Legacy(t *testing.T) {
+	var receivedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "GET":
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": "12345",
+				"title": "Test",
+				"version": {"number": 1},
+				"body": {"storage": {"value": "<p>Old</p>"}},
+				"_links": {"webui": "/pages/12345"}
+			}`))
+		case "PUT":
+			body, _ := io.ReadAll(r.Body)
+			json.Unmarshal(body, &receivedBody)
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": "12345",
+				"title": "Test",
+				"version": {"number": 2},
+				"_links": {"webui": "/pages/12345"}
+			}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test@example.com", "token")
+	opts := &editOptions{
+		pageID:  "12345",
+		stdin:   strings.NewReader("# Updated\n\nNew **bold** content."),
+		legacy:  true,
+		noColor: true,
+	}
+
+	err := runEdit(opts, client)
+	require.NoError(t, err)
+
+	// Verify storage format was used
+	bodyMap := receivedBody["body"].(map[string]interface{})
+	storageMap := bodyMap["storage"].(map[string]interface{})
+	content := storageMap["value"].(string)
+
+	assert.Contains(t, content, "<h1")
+	assert.Contains(t, content, "<strong>bold</strong>")
+}
+
+func TestRunEdit_TitleAndContent(t *testing.T) {
+	var receivedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "GET":
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": "12345",
+				"title": "Old Title",
+				"version": {"number": 1},
+				"body": {"storage": {"value": "<p>Old</p>"}},
+				"_links": {"webui": "/pages/12345"}
+			}`))
+		case "PUT":
+			body, _ := io.ReadAll(r.Body)
+			json.Unmarshal(body, &receivedBody)
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": "12345",
+				"title": "New Title",
+				"version": {"number": 2},
+				"_links": {"webui": "/pages/12345"}
+			}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test@example.com", "token")
+	opts := &editOptions{
+		pageID:  "12345",
+		title:   "New Title",
+		stdin:   strings.NewReader("# New Content"),
+		noColor: true,
+	}
+
+	err := runEdit(opts, client)
+	require.NoError(t, err)
+
+	// Verify both title and content were updated
+	assert.Equal(t, "New Title", receivedBody["title"])
+	bodyMap := receivedBody["body"].(map[string]interface{})
+	adfMap := bodyMap["atlas_doc_format"].(map[string]interface{})
+	assert.NotNil(t, adfMap["value"])
+}
+
+func TestRunEdit_ComplexMarkdown_ADF(t *testing.T) {
+	var receivedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "GET":
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": "12345",
+				"title": "Test",
+				"version": {"number": 1},
+				"body": {"storage": {"value": "<p>Old</p>"}},
+				"_links": {"webui": "/pages/12345"}
+			}`))
+		case "PUT":
+			body, _ := io.ReadAll(r.Body)
+			json.Unmarshal(body, &receivedBody)
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": "12345",
+				"title": "Test",
+				"version": {"number": 2},
+				"_links": {"webui": "/pages/12345"}
+			}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	complexMarkdown := `# Title
+
+| Header 1 | Header 2 |
+|----------|----------|
+| Cell 1   | Cell 2   |
+
+- Item 1
+  - Nested item
+- Item 2
+
+` + "```go\nfunc main() {\n    fmt.Println(\"Hello\")\n}\n```"
+
+	client := api.NewClient(server.URL, "test@example.com", "token")
+	opts := &editOptions{
+		pageID:  "12345",
+		stdin:   strings.NewReader(complexMarkdown),
+		noColor: true,
+	}
+
+	err := runEdit(opts, client)
+	require.NoError(t, err)
+
+	// Verify ADF contains complex elements
+	bodyMap := receivedBody["body"].(map[string]interface{})
+	adfMap := bodyMap["atlas_doc_format"].(map[string]interface{})
+	content := adfMap["value"].(string)
+
+	assert.Contains(t, content, `"type":"table"`)
+	assert.Contains(t, content, `"type":"bulletList"`)
+	assert.Contains(t, content, `"type":"codeBlock"`)
+	assert.Contains(t, content, `"language":"go"`)
+}
