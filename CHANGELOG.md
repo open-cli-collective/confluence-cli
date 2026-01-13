@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/rianjs/confluence-cli/compare/v0.4.0...v0.5.0) (2026-01-13)
+
+
+### Features
+
+* add cloud editor (ADF) support for page creation ([#40](https://github.com/rianjs/confluence-cli/issues/40)) ([ae8eb8b](https://github.com/rianjs/confluence-cli/commit/ae8eb8b1aa5654ea7cf1085b4bd5229698f75ebf))
+
 ## [0.4.0](https://github.com/rianjs/confluence-cli/compare/v0.3.2...v0.4.0) (2026-01-12)
 
 
