@@ -46,22 +46,27 @@ This document catalogs the manual integration test suite for `cfl`. These tests 
 | Create from stdin | `echo "# Test" \| cfl page create -s confluence -t "Test Page"` | Page created, shows ID and URL |
 | Create from file | `cfl page create -s confluence -t "Test" --file content.md` | Page created from file content |
 | Create child page | `cfl page create -s confluence -t "Child" --parent <id>` | Page created with parentId set |
-| Create with XHTML | `echo "<p>Test</p>" \| cfl page create -s confluence -t "Test" --no-markdown` | Page created without markdown conversion |
+| Create with XHTML (legacy) | `echo "<p>Test</p>" \| cfl page create -s confluence -t "Test" --no-markdown --legacy` | Page created without markdown conversion |
 | Missing title | `cfl page create -s confluence` | Error: title required |
 | Missing space | `cfl page create -t "Test"` | Error: space required |
 | Duplicate title | Create same title twice | Error: "page already exists with same TITLE" |
 | Very long title (300+ chars) | Create with long title | Error: API rejects (400) |
 | Empty content | `echo "" \| cfl page create -s confluence -t "Empty"` | Page created (empty content allowed) |
+| Create (cloud editor) | `echo "# Test" \| cfl page create -s confluence -t "Test"` | Page uses cloud editor (see verification below) |
+| Create (legacy editor) | `echo "# Test" \| cfl page create -s confluence -t "Test" --legacy` | Page uses legacy editor |
+| Create with code block (cloud) | Create page with fenced code block | Code block preserved as `codeBlock` in ADF |
 
 ### page edit
 
 | Test Case | Command | Expected Result |
 |-----------|---------|-----------------|
 | Edit from file | `cfl page edit <id> --file updated.md` | Page updated, version incremented |
-| Edit with --no-markdown | `cfl page edit <id> --file content.html --no-markdown` | Raw XHTML preserved |
+| Edit with --no-markdown (legacy) | `cfl page edit <id> --file content.html --no-markdown --legacy` | Raw XHTML preserved |
 | Edit page with tables (markdown mode) | Edit without --no-markdown | See "Confluence UI-Created Content" section |
 | Edit page with code blocks (UI-created) | Edit without --no-markdown | See "Confluence UI-Created Content" section |
 | Non-existent page | `cfl page edit 99999999999` | Error: 404 not found |
+| Edit (cloud editor) | `cfl page edit <id> --file updated.md` | Page stays in cloud editor format |
+| Edit (legacy editor) | `cfl page edit <id> --file updated.md --legacy` | Page uses legacy storage format |
 
 ### page copy
 
@@ -208,6 +213,58 @@ Pages created in Confluence's web UI use proprietary macros that may not round-t
 
 ---
 
+## Cloud Editor vs Legacy Editor
+
+Pages created via `cfl` now use the **cloud editor** format (ADF) by default. Use `--legacy` to create pages in the legacy editor format (storage/XHTML).
+
+### Verifying Editor Format
+
+**Visual verification:**
+- Open the page in Confluence web UI
+- Legacy pages show a "Legacy editor" badge in the toolbar
+- Cloud pages have no badge (or show the modern editor)
+
+**API verification:**
+```bash
+# Check editor property via v1 API
+curl -s -u "$EMAIL:$TOKEN" "$URL/rest/api/content/<page-id>?expand=metadata.properties.editor"
+
+# Cloud editor: editor property is null/absent
+# Legacy editor: editor.value = "v1"
+```
+
+**ADF structure verification:**
+```bash
+# Read page as ADF format
+curl -s -u "$EMAIL:$TOKEN" "$URL/api/v2/pages/<page-id>?body-format=atlas_doc_format" | jq '.body.atlas_doc_format.value'
+
+# Cloud pages have proper ADF structure:
+# {"type":"doc","version":1,"content":[...]}
+
+# Check code blocks are proper codeBlock nodes (not paragraphs with code marks)
+# Proper: {"type":"codeBlock","attrs":{"language":"go"},"content":[...]}
+# Wrong: {"type":"paragraph","content":[{"type":"text","marks":[{"type":"code"}],...}]}
+```
+
+### Test Cases
+
+| Test Case | Steps | Expected Result |
+|-----------|-------|-----------------|
+| Create page (default) | 1. Create page with code block<br>2. Open in browser | No "Legacy editor" badge |
+| Create page (--legacy) | 1. Create page with `--legacy`<br>2. Open in browser | Shows "Legacy editor" badge |
+| Code block preservation | 1. Create page with fenced code block<br>2. Read as ADF | Has `codeBlock` node with language attr |
+| Edit maintains format | 1. Create cloud page<br>2. Edit with `cfl page edit`<br>3. View in browser | Still cloud editor |
+| Edit with --legacy | 1. Create any page<br>2. Edit with `--legacy` flag | Updates use storage format |
+
+### Known Behavior
+
+- **Default (cloud editor)**: Markdown converted to ADF JSON, code blocks properly preserved
+- **--legacy flag**: Markdown converted to XHTML storage format
+- **Storage→ADF conversion**: Confluence's built-in conversion loses code block structure (converts to paragraph with code mark)
+- **Recommendation**: Use default (cloud editor) for new pages, use `--legacy` only for compatibility with existing legacy pages
+
+---
+
 ## Edge Cases & Error Handling
 
 ### Unicode & Special Characters
@@ -248,12 +305,15 @@ Before GA release, run through this checklist:
 - [ ] Verify config: `cfl space list` works
 
 ### Page CRUD
-- [ ] Create page from stdin
+- [ ] Create page from stdin (cloud editor)
+- [ ] Create page with code block (verify ADF codeBlock)
 - [ ] Create page from file
+- [ ] Create page with --legacy flag
 - [ ] Create child page
 - [ ] View page (markdown)
 - [ ] View page (raw)
 - [ ] Edit page from file
+- [ ] Edit page with --legacy flag
 - [ ] Copy page (same space)
 - [ ] Copy page (different space)
 - [ ] Delete page (with confirmation)

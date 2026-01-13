@@ -260,13 +260,14 @@ func TestRunEdit_HTMLFile(t *testing.T) {
 	opts := &editOptions{
 		pageID:  "12345",
 		file:    htmlFile,
+		legacy:  true, // Use legacy mode for HTML files
 		noColor: true,
 	}
 
 	err = runEdit(opts, client)
 	require.NoError(t, err)
 
-	// Verify HTML was not converted
+	// Verify HTML was not converted (storage format in legacy mode)
 	bodyMap := receivedBody["body"].(map[string]interface{})
 	storageMap := bodyMap["storage"].(map[string]interface{})
 	content := storageMap["value"].(string)
@@ -313,17 +314,74 @@ func TestRunEdit_NoMarkdownFlag(t *testing.T) {
 		pageID:   "12345",
 		file:     mdFile,
 		markdown: &useMd,
+		legacy:   true, // Use legacy mode for storage format
 		noColor:  true,
 	}
 
 	err = runEdit(opts, client)
 	require.NoError(t, err)
 
-	// Verify content was not converted
+	// Verify content was not converted (storage format in legacy mode)
 	bodyMap := receivedBody["body"].(map[string]interface{})
 	storageMap := bodyMap["storage"].(map[string]interface{})
 	content := storageMap["value"].(string)
 	assert.Equal(t, "<p>Raw XHTML in .md file</p>", content)
+}
+
+func TestRunEdit_MarkdownToADF(t *testing.T) {
+	tmpDir := t.TempDir()
+	mdFile := filepath.Join(tmpDir, "content.md")
+	err := os.WriteFile(mdFile, []byte("# Updated\n\nNew **bold** text."), 0644)
+	require.NoError(t, err)
+
+	var receivedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "GET":
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": "12345",
+				"title": "Test",
+				"version": {"number": 1},
+				"body": {"storage": {"value": "<p>Old</p>"}},
+				"_links": {"webui": "/pages/12345"}
+			}`))
+		case "PUT":
+			body, _ := io.ReadAll(r.Body)
+			json.Unmarshal(body, &receivedBody)
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": "12345",
+				"title": "Test",
+				"version": {"number": 2},
+				"_links": {"webui": "/pages/12345"}
+			}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test@example.com", "token")
+	opts := &editOptions{
+		pageID:  "12345",
+		file:    mdFile,
+		noColor: true,
+		// Default: not legacy, uses ADF
+	}
+
+	err = runEdit(opts, client)
+	require.NoError(t, err)
+
+	// Verify ADF format was used (default)
+	bodyMap := receivedBody["body"].(map[string]interface{})
+	adfMap := bodyMap["atlas_doc_format"].(map[string]interface{})
+	content := adfMap["value"].(string)
+
+	// Should be valid ADF JSON
+	assert.Contains(t, content, `"type":"doc"`)
+	assert.Contains(t, content, `"type":"heading"`)
+	assert.Contains(t, content, `"type":"strong"`)
 }
 
 func TestRunEdit_JSONOutput(t *testing.T) {
