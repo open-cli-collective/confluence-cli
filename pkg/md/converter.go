@@ -59,6 +59,21 @@ func preprocessMacros(markdown []byte) ([]byte, map[int]string) {
 		return placeholder
 	})
 
+	// Convert panel macros: [INFO]...[/INFO], [WARNING]...[/WARNING], etc.
+	// Go's regexp doesn't support backreferences, so we match each type separately
+	panelTypes := []string{"INFO", "WARNING", "NOTE", "TIP", "EXPAND"}
+	for _, panelType := range panelTypes {
+		// Case-insensitive matching, supports parameters like [INFO title="Title"]
+		pattern := regexp.MustCompile(`(?is)\[` + panelType + `([^\]]*)\](.*?)\[/` + panelType + `\]`)
+		result = pattern.ReplaceAllStringFunc(result, func(match string) string {
+			macroXML := convertPanelMacro(match, panelType)
+			macros[counter] = macroXML
+			placeholder := macroPlaceholderPrefix + fmt.Sprintf("%d", counter) + macroPlaceholderSuffix
+			counter++
+			return placeholder
+		})
+	}
+
 	return []byte(result), macros
 }
 
@@ -75,6 +90,71 @@ func postprocessMacros(html string, macros map[int]string) string {
 		}
 	}
 	return html
+}
+
+// convertPanelMacro converts a [INFO]...[/INFO] style placeholder to Confluence structured macro XML.
+func convertPanelMacro(match string, panelType string) string {
+	// Extract parameters and body content
+	pattern := regexp.MustCompile(`(?is)\[` + panelType + `([^\]]*)\](.*?)\[/` + panelType + `\]`)
+	groups := pattern.FindStringSubmatch(match)
+
+	if len(groups) < 3 {
+		return match // Return unchanged if pattern doesn't match
+	}
+
+	macroName := strings.ToLower(panelType)
+	paramStr := strings.TrimSpace(groups[1])
+	bodyContent := strings.TrimSpace(groups[2])
+
+	// Parse parameters
+	var params []string
+	if paramStr != "" {
+		params = parseKeyValueParams(paramStr)
+	}
+
+	// Convert body content from markdown to HTML
+	var bodyHTML string
+	if bodyContent != "" {
+		// Use goldmark to convert the body content
+		var buf bytes.Buffer
+		if err := mdParser.Convert([]byte(bodyContent), &buf); err == nil {
+			bodyHTML = buf.String()
+		} else {
+			// Fallback: wrap in paragraph
+			bodyHTML = "<p>" + bodyContent + "</p>"
+		}
+	}
+
+	// Build the Confluence macro XML
+	var sb strings.Builder
+	sb.WriteString(`<ac:structured-macro ac:name="`)
+	sb.WriteString(macroName)
+	sb.WriteString(`" ac:schema-version="1">`)
+
+	// Add parameters
+	for _, param := range params {
+		parts := strings.SplitN(param, "=", 2)
+		if len(parts) == 2 {
+			name := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			sb.WriteString(`<ac:parameter ac:name="`)
+			sb.WriteString(name)
+			sb.WriteString(`">`)
+			sb.WriteString(value)
+			sb.WriteString(`</ac:parameter>`)
+		}
+	}
+
+	// Add body content
+	if bodyHTML != "" {
+		sb.WriteString(`<ac:rich-text-body>`)
+		sb.WriteString(strings.TrimSpace(bodyHTML))
+		sb.WriteString(`</ac:rich-text-body>`)
+	}
+
+	sb.WriteString(`</ac:structured-macro>`)
+
+	return sb.String()
 }
 
 // convertTOCMacro converts a [TOC ...] placeholder to Confluence structured macro XML.

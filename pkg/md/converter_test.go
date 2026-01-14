@@ -328,3 +328,167 @@ func TestParseKeyValueParams(t *testing.T) {
 		})
 	}
 }
+
+func TestToConfluenceStorage_PanelMacros(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		contains []string
+	}{
+		{
+			name:  "simple info panel",
+			input: "[INFO]\nThis is info content.\n[/INFO]",
+			contains: []string{
+				`<ac:structured-macro ac:name="info" ac:schema-version="1">`,
+				`<ac:rich-text-body>`,
+				`This is info content.`,
+				`</ac:rich-text-body>`,
+				`</ac:structured-macro>`,
+			},
+		},
+		{
+			name:  "warning panel with title",
+			input: `[WARNING title="Watch out"]` + "\nBe careful here.\n[/WARNING]",
+			contains: []string{
+				`<ac:structured-macro ac:name="warning" ac:schema-version="1">`,
+				`<ac:parameter ac:name="title">Watch out</ac:parameter>`,
+				`<ac:rich-text-body>`,
+				`Be careful here.`,
+				`</ac:rich-text-body>`,
+				`</ac:structured-macro>`,
+			},
+		},
+		{
+			name:  "note panel",
+			input: "[NOTE]\nNote content.\n[/NOTE]",
+			contains: []string{
+				`<ac:structured-macro ac:name="note" ac:schema-version="1">`,
+				`Note content.`,
+				`</ac:structured-macro>`,
+			},
+		},
+		{
+			name:  "tip panel",
+			input: "[TIP]\nTip content.\n[/TIP]",
+			contains: []string{
+				`<ac:structured-macro ac:name="tip" ac:schema-version="1">`,
+				`Tip content.`,
+				`</ac:structured-macro>`,
+			},
+		},
+		{
+			name:  "expand panel with title",
+			input: `[EXPAND title="Click to expand"]` + "\nHidden content.\n[/EXPAND]",
+			contains: []string{
+				`<ac:structured-macro ac:name="expand" ac:schema-version="1">`,
+				`<ac:parameter ac:name="title">Click to expand</ac:parameter>`,
+				`Hidden content.`,
+				`</ac:structured-macro>`,
+			},
+		},
+		{
+			name:  "panel case insensitive - lowercase",
+			input: "[info]\nContent.\n[/info]",
+			contains: []string{
+				`<ac:structured-macro ac:name="info" ac:schema-version="1">`,
+				`Content.`,
+				`</ac:structured-macro>`,
+			},
+		},
+		{
+			name:  "panel case insensitive - mixed case",
+			input: "[Info]\nContent.\n[/Info]",
+			contains: []string{
+				`<ac:structured-macro ac:name="info" ac:schema-version="1">`,
+				`Content.`,
+				`</ac:structured-macro>`,
+			},
+		},
+		{
+			name:  "panel with markdown content",
+			input: "[INFO]\nThis is **bold** and *italic*.\n[/INFO]",
+			contains: []string{
+				`<ac:structured-macro ac:name="info" ac:schema-version="1">`,
+				`<strong>bold</strong>`,
+				`<em>italic</em>`,
+				`</ac:structured-macro>`,
+			},
+		},
+		{
+			name:  "panel with list content",
+			input: "[NOTE]\n- Item 1\n- Item 2\n[/NOTE]",
+			contains: []string{
+				`<ac:structured-macro ac:name="note" ac:schema-version="1">`,
+				`<li>Item 1</li>`,
+				`<li>Item 2</li>`,
+				`</ac:structured-macro>`,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ToConfluenceStorage([]byte(tt.input))
+			require.NoError(t, err)
+			for _, expected := range tt.contains {
+				assert.Contains(t, result, expected, "should contain: %s", expected)
+			}
+		})
+	}
+}
+
+func TestToConfluenceStorage_PanelMixedWithContent(t *testing.T) {
+	input := `# Heading
+
+Some intro text.
+
+[WARNING title="Important"]
+This is a warning.
+[/WARNING]
+
+More text after.
+`
+	result, err := ToConfluenceStorage([]byte(input))
+	require.NoError(t, err)
+
+	// Verify all parts are present
+	assert.Contains(t, result, "<h1>Heading</h1>")
+	assert.Contains(t, result, "Some intro text.")
+	assert.Contains(t, result, `<ac:structured-macro ac:name="warning" ac:schema-version="1">`)
+	assert.Contains(t, result, `<ac:parameter ac:name="title">Important</ac:parameter>`)
+	assert.Contains(t, result, "This is a warning.")
+	assert.Contains(t, result, "</ac:structured-macro>")
+	assert.Contains(t, result, "More text after.")
+}
+
+func TestToConfluenceStorage_PanelRoundtrip(t *testing.T) {
+	// Test that panel can survive a roundtrip conversion
+	// Use a simple title without spaces to avoid quoting complexity
+	originalXHTML := `<p>Before</p>
+<ac:structured-macro ac:name="info" ac:schema-version="1">
+<ac:parameter ac:name="title">Important</ac:parameter>
+<ac:rich-text-body><p>Panel content here.</p></ac:rich-text-body>
+</ac:structured-macro>
+<p>After</p>`
+
+	// Convert to markdown with ShowMacros
+	opts := ConvertOptions{ShowMacros: true}
+	markdown, err := FromConfluenceStorageWithOptions(originalXHTML, opts)
+	require.NoError(t, err)
+
+	// Verify markdown has panel placeholder (brackets may be escaped by markdown converter)
+	assert.Contains(t, markdown, "INFO")
+	assert.Contains(t, markdown, "title=Important")
+	assert.Contains(t, markdown, "Panel content")
+
+	// Convert back to storage format
+	resultXHTML, err := ToConfluenceStorage([]byte(markdown))
+	require.NoError(t, err)
+
+	// Verify panel macro is restored
+	assert.Contains(t, resultXHTML, `<ac:structured-macro ac:name="info" ac:schema-version="1">`)
+	assert.Contains(t, resultXHTML, `<ac:parameter ac:name="title">Important</ac:parameter>`)
+	assert.Contains(t, resultXHTML, `<ac:rich-text-body>`)
+	assert.Contains(t, resultXHTML, `Panel content`)
+	assert.Contains(t, resultXHTML, `</ac:rich-text-body>`)
+}
