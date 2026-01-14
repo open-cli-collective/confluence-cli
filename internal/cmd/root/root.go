@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rianjs/confluence-cli/internal/cmd/attachment"
+	"github.com/rianjs/confluence-cli/internal/cmd/completion"
 	initcmd "github.com/rianjs/confluence-cli/internal/cmd/init"
 	"github.com/rianjs/confluence-cli/internal/cmd/page"
 	"github.com/rianjs/confluence-cli/internal/cmd/search"
@@ -42,6 +43,7 @@ Get started by running: cfl init`,
 	cmd.AddCommand(space.NewCmdSpace())
 	cmd.AddCommand(attachment.NewCmdAttachment())
 	cmd.AddCommand(search.NewCmdSearch())
+	cmd.AddCommand(completion.NewCmdCompletion())
 
 	return cmd
 }
