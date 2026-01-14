@@ -69,14 +69,38 @@ func processConfluenceMacros(html string, showMacros bool) string {
 		// Strip macros entirely
 		html = macroPattern.ReplaceAllString(html, "")
 	} else {
-		// Replace with placeholder text
+		// Replace with placeholder text including parameters
 		html = macroPattern.ReplaceAllStringFunc(html, func(match string) string {
 			nameMatch := regexp.MustCompile(`ac:name="([^"]*)"`).FindStringSubmatch(match)
-			if len(nameMatch) > 1 {
-				macroName := strings.ToUpper(nameMatch[1])
+			if len(nameMatch) < 2 {
+				return "[MACRO]"
+			}
+			macroName := strings.ToUpper(nameMatch[1])
+
+			// Extract parameters from the macro
+			paramPattern := regexp.MustCompile(`<ac:parameter[^>]*ac:name="([^"]*)"[^>]*>([^<]*)</ac:parameter>`)
+			paramMatches := paramPattern.FindAllStringSubmatch(match, -1)
+
+			if len(paramMatches) == 0 {
 				return "[" + macroName + "]"
 			}
-			return "[MACRO]"
+
+			// Build parameter string: [TOC maxLevel=3 minLevel=1]
+			var params []string
+			for _, p := range paramMatches {
+				if len(p) >= 3 {
+					paramName := strings.TrimSpace(p[1])
+					paramValue := strings.TrimSpace(p[2])
+					if paramName != "" && paramValue != "" {
+						params = append(params, paramName+"="+paramValue)
+					}
+				}
+			}
+
+			if len(params) == 0 {
+				return "[" + macroName + "]"
+			}
+			return "[" + macroName + " " + strings.Join(params, " ") + "]"
 		})
 	}
 

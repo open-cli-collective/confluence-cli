@@ -228,9 +228,9 @@ Pages created in Confluence's web UI use proprietary macros that may not round-t
 
 **Note**: Tables and code blocks now work. Use `--no-markdown` for pages with info panels, expand macros, or TOC.
 
-### Macro Roundtrip (Planned - Issue #51)
+### Macro Roundtrip (Issue #51)
 
-Tests for `--show-macros` roundtrip support:
+Tests for `--show-macros` roundtrip support. **Phase 1 (TOC) implemented.**
 
 | Test Case | Command | Expected Result |
 |-----------|---------|-----------------|

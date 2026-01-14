@@ -239,6 +239,101 @@ func TestFromConfluenceStorage_NonCodeMacrosStripped(t *testing.T) {
 	assert.NotContains(t, result, "maxLevel")
 }
 
+func TestFromConfluenceStorage_TOCWithShowMacros(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name: "TOC without parameters",
+			input: `<p>Before</p>
+			<ac:structured-macro ac:name="toc" ac:schema-version="1">
+			</ac:structured-macro>
+			<p>After</p>`,
+			expected: "[TOC]",
+		},
+		{
+			name: "TOC with single parameter",
+			input: `<p>Before</p>
+			<ac:structured-macro ac:name="toc" ac:schema-version="1">
+				<ac:parameter ac:name="maxLevel">3</ac:parameter>
+			</ac:structured-macro>
+			<p>After</p>`,
+			expected: "[TOC maxLevel=3]",
+		},
+		{
+			name: "TOC with multiple parameters",
+			input: `<p>Before</p>
+			<ac:structured-macro ac:name="toc" ac:schema-version="1">
+				<ac:parameter ac:name="maxLevel">3</ac:parameter>
+				<ac:parameter ac:name="minLevel">1</ac:parameter>
+				<ac:parameter ac:name="type">flat</ac:parameter>
+			</ac:structured-macro>
+			<p>After</p>`,
+			expected: "[TOC maxLevel=3 minLevel=1 type=flat]",
+		},
+		{
+			name: "TOC with outline parameter",
+			input: `<ac:structured-macro ac:name="toc" ac:schema-version="1">
+				<ac:parameter ac:name="outline">true</ac:parameter>
+				<ac:parameter ac:name="separator">pipe</ac:parameter>
+			</ac:structured-macro>`,
+			expected: "[TOC outline=true separator=pipe]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := ConvertOptions{ShowMacros: true}
+			result, err := FromConfluenceStorageWithOptions(tt.input, opts)
+			require.NoError(t, err)
+			assert.Contains(t, result, tt.expected)
+		})
+	}
+}
+
+func TestFromConfluenceStorage_OtherMacrosWithShowMacros(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name: "info macro without parameters",
+			input: `<ac:structured-macro ac:name="info" ac:schema-version="1">
+				<ac:rich-text-body><p>Info content</p></ac:rich-text-body>
+			</ac:structured-macro>`,
+			expected: "[INFO]",
+		},
+		{
+			name: "warning macro with title",
+			input: `<ac:structured-macro ac:name="warning" ac:schema-version="1">
+				<ac:parameter ac:name="title">Watch out</ac:parameter>
+				<ac:rich-text-body><p>Warning content</p></ac:rich-text-body>
+			</ac:structured-macro>`,
+			expected: "[WARNING title=Watch out]",
+		},
+		{
+			name: "expand macro with title",
+			input: `<ac:structured-macro ac:name="expand" ac:schema-version="1">
+				<ac:parameter ac:name="title">Click to expand</ac:parameter>
+				<ac:rich-text-body><p>Hidden content</p></ac:rich-text-body>
+			</ac:structured-macro>`,
+			expected: "[EXPAND title=Click to expand]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := ConvertOptions{ShowMacros: true}
+			result, err := FromConfluenceStorageWithOptions(tt.input, opts)
+			require.NoError(t, err)
+			assert.Contains(t, result, tt.expected)
+		})
+	}
+}
+
 func TestFromConfluenceStorage_ComplexDocument(t *testing.T) {
 	input := `<h1>Project README</h1>
 <p>This is the <strong>introduction</strong> to the project.</p>
