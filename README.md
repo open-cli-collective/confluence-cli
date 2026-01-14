@@ -203,6 +203,9 @@ echo "<p>Hello</p>" | cfl page create -s DEV -t "My Page" --no-markdown
 
 # Create as child of another page
 cfl page create -s DEV -t "Child Page" --parent 12345
+
+# Create using legacy storage format (for compatibility with legacy editor pages)
+cfl page create -s DEV -t "Legacy Page" --file content.md --legacy
 ```
 
 | Flag | Short | Default | Description |
@@ -213,6 +216,7 @@ cfl page create -s DEV -t "Child Page" --parent 12345
 | `--file` | `-f` | | Read content from file |
 | `--editor` | | `false` | Force open in $EDITOR |
 | `--no-markdown` | | `false` | Disable markdown conversion (use raw XHTML) |
+| `--legacy` | | `false` | Use legacy storage format instead of cloud editor (ADF) |
 
 **Format detection:**
 - `.md`, `.markdown` files → markdown (converted to XHTML)
@@ -244,14 +248,25 @@ echo "# Updated Content" | cfl page edit 12345
 
 # Update only the page title
 cfl page edit 12345 --title "New Title"
+
+# Move page to a new parent
+cfl page edit 12345 --parent 67890
+
+# Move page and rename in one command
+cfl page edit 12345 --parent 67890 --title "New Title"
+
+# Edit using legacy storage format (for pages created in legacy editor)
+cfl page edit 12345 --file content.md --legacy
 ```
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--title` | `-t` | | New page title (keeps existing if not specified) |
+| `--parent` | `-p` | | Move page to new parent page ID |
 | `--file` | `-f` | | Read content from file |
 | `--editor` | | `false` | Force open in $EDITOR |
 | `--no-markdown` | | `false` | Disable markdown conversion (use raw XHTML) |
+| `--legacy` | | `false` | Use legacy storage format instead of cloud editor (ADF) |
 
 **Arguments:**
 - `<page-id>` - The page ID (**required**)
