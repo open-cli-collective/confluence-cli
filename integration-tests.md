@@ -228,6 +228,26 @@ Pages created in Confluence's web UI use proprietary macros that may not round-t
 
 **Note**: Tables and code blocks now work. Use `--no-markdown` for pages with info panels, expand macros, or TOC.
 
+### Macro Roundtrip (Planned - Issue #51)
+
+Tests for `--show-macros` roundtrip support:
+
+| Test Case | Command | Expected Result |
+|-----------|---------|-----------------|
+| View TOC with params | `cfl page view <toc-page> --show-macros` | Shows `[TOC maxLevel=3]` with parameters |
+| Roundtrip TOC | `cfl page view <id> --show-macros \| cfl page edit <id>` | TOC macro preserved in page |
+| Create with TOC | `echo "[TOC]\n# H1\n## H2" \| cfl page create -s SPACE -t "TOC Test"` | Page has working TOC |
+| View info panel | `cfl page view <panel-page> --show-macros` | Shows `[INFO]...[/INFO]` |
+| Create with panel | `echo "[WARNING]Be careful[/WARNING]" \| cfl page create ...` | Warning panel in page |
+| Roundtrip panel | Pipe view to edit | Panel preserved with content |
+| View expand | `cfl page view <expand-page> --show-macros` | Shows `[EXPAND]...[/EXPAND]` |
+| Create with expand | Create page with expand syntax | Expand works in Confluence |
+
+**Syntax Reference:**
+- TOC: `[TOC]` or `[TOC maxLevel=3 minLevel=1]`
+- Panels: `[INFO]content[/INFO]`, `[WARNING]`, `[NOTE]`, `[TIP]`
+- Expand: `[EXPAND title="Click me"]content[/EXPAND]`
+
 ---
 
 ## Cloud Editor vs Legacy Editor
