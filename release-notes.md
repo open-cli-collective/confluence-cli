@@ -1,5 +1,14 @@
 # Release Notes
 
+## v0.6.0 (2026-01-14)
+
+Add shell tab completion support for bash, zsh, fish, and PowerShell.
+
+### Features
+- Add `cfl completion` command with subcommands for bash, zsh, fish, and PowerShell ([#43](https://github.com/rianjs/confluence-cli/issues/43))
+
+---
+
 ## v0.5.0 (2026-01-13)
 
 Pages now use the modern cloud editor (ADF) format by default.

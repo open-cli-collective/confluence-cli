@@ -476,6 +476,60 @@ cfl space list -o plain  # Tab-separated for piping to other tools
 
 ---
 
+## Shell Completion
+
+cfl supports tab completion for bash, zsh, fish, and PowerShell.
+
+### Bash
+
+```bash
+# Load in current session
+source <(cfl completion bash)
+
+# Install permanently (Linux)
+cfl completion bash | sudo tee /etc/bash_completion.d/cfl > /dev/null
+
+# Install permanently (macOS with Homebrew)
+cfl completion bash > $(brew --prefix)/etc/bash_completion.d/cfl
+```
+
+### Zsh
+
+```bash
+# Load in current session
+source <(cfl completion zsh)
+
+# Install permanently
+mkdir -p ~/.zsh/completions
+cfl completion zsh > ~/.zsh/completions/_cfl
+
+# Add to ~/.zshrc if not already present:
+# fpath=(~/.zsh/completions $fpath)
+# autoload -Uz compinit && compinit
+```
+
+### Fish
+
+```bash
+# Load in current session
+cfl completion fish | source
+
+# Install permanently
+cfl completion fish > ~/.config/fish/completions/cfl.fish
+```
+
+### PowerShell
+
+```powershell
+# Load in current session
+cfl completion powershell | Out-String | Invoke-Expression
+
+# Install permanently (add to $PROFILE)
+cfl completion powershell >> $PROFILE
+```
+
+---
+
 ## Development
 
 ### Prerequisites
