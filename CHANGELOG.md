@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/rianjs/confluence-cli/compare/v0.5.0...v0.6.0) (2026-01-14)
+
+
+### Features
+
+* add shell completion support ([#44](https://github.com/rianjs/confluence-cli/issues/44)) ([10dbc24](https://github.com/rianjs/confluence-cli/commit/10dbc245b8f09c347c567ca29687b074dbf80ec0)), closes [#43](https://github.com/rianjs/confluence-cli/issues/43)
+
 ## [0.5.0](https://github.com/rianjs/confluence-cli/compare/v0.4.0...v0.5.0) (2026-01-13)
 
 
