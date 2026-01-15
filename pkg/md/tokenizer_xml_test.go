@@ -1,6 +1,7 @@
 package md
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -195,4 +196,165 @@ func TestTokenizeConfluenceXML_Positions(t *testing.T) {
 	assert.Equal(t, 0, tokens[0].Position)  // "abc"
 	assert.Equal(t, 3, tokens[1].Position)  // macro open
 	// Close and "def" positions will follow
+}
+
+func TestTokenizeConfluenceXML_CDATAWithSpecialChars(t *testing.T) {
+	input := `<ac:structured-macro ac:name="code" ac:schema-version="1"><ac:plain-text-body><![CDATA[if x < 10 && y > 5 {
+    fmt.Println("test")
+}]]></ac:plain-text-body></ac:structured-macro>`
+	tokens, err := TokenizeConfluenceXML(input)
+	require.NoError(t, err)
+
+	// Find the CDATA content token
+	var cdataToken *XMLToken
+	for i := range tokens {
+		if tokens[i].Type == XMLTokenText && strings.Contains(tokens[i].Text, "x < 10") {
+			cdataToken = &tokens[i]
+			break
+		}
+	}
+
+	require.NotNil(t, cdataToken, "should find CDATA content")
+	assert.Contains(t, cdataToken.Text, "x < 10")
+	assert.Contains(t, cdataToken.Text, "&&")
+	assert.Contains(t, cdataToken.Text, "y > 5")
+}
+
+func TestTokenizeConfluenceXML_MultilineCDATA(t *testing.T) {
+	input := `<ac:structured-macro ac:name="code" ac:schema-version="1"><ac:plain-text-body><![CDATA[
+line1
+line2
+line3
+]]></ac:plain-text-body></ac:structured-macro>`
+	tokens, err := TokenizeConfluenceXML(input)
+	require.NoError(t, err)
+
+	// Find CDATA content
+	var found bool
+	for _, tok := range tokens {
+		if tok.Type == XMLTokenText && strings.Contains(tok.Text, "line1") {
+			found = true
+			assert.Contains(t, tok.Text, "line2")
+			assert.Contains(t, tok.Text, "line3")
+			assert.Contains(t, tok.Text, "\n")
+		}
+	}
+	assert.True(t, found, "should find multiline CDATA content")
+}
+
+func TestTokenizeConfluenceXML_DeeplyNestedMacros(t *testing.T) {
+	input := `<ac:structured-macro ac:name="info" ac:schema-version="1"><ac:rich-text-body><ac:structured-macro ac:name="warning" ac:schema-version="1"><ac:rich-text-body><ac:structured-macro ac:name="note" ac:schema-version="1"><ac:rich-text-body><p>Deep</p></ac:rich-text-body></ac:structured-macro></ac:rich-text-body></ac:structured-macro></ac:rich-text-body></ac:structured-macro>`
+	tokens, err := TokenizeConfluenceXML(input)
+	require.NoError(t, err)
+
+	// Count opens and closes
+	openCount := 0
+	closeCount := 0
+	macroNames := []string{}
+	for _, tok := range tokens {
+		if tok.Type == XMLTokenOpenTag {
+			openCount++
+			macroNames = append(macroNames, tok.MacroName)
+		}
+		if tok.Type == XMLTokenCloseTag {
+			closeCount++
+		}
+	}
+
+	assert.Equal(t, 3, openCount, "should have 3 macro opens")
+	assert.Equal(t, 3, closeCount, "should have 3 macro closes")
+	assert.Contains(t, macroNames, "info")
+	assert.Contains(t, macroNames, "warning")
+	assert.Contains(t, macroNames, "note")
+}
+
+func TestTokenizeConfluenceXML_WhitespaceInMacro(t *testing.T) {
+	input := `<ac:structured-macro ac:name="toc" ac:schema-version="1">
+    <ac:parameter ac:name="maxLevel">3</ac:parameter>
+</ac:structured-macro>`
+	tokens, err := TokenizeConfluenceXML(input)
+	require.NoError(t, err)
+
+	// Should still find open, param, close (whitespace becomes text tokens)
+	var foundParam bool
+	for _, tok := range tokens {
+		if tok.Type == XMLTokenParameter && tok.ParamName == "maxLevel" {
+			foundParam = true
+			assert.Equal(t, "3", tok.Value)
+		}
+	}
+	assert.True(t, foundParam, "should find maxLevel parameter")
+}
+
+func TestTokenizeConfluenceXML_EmptyParameter(t *testing.T) {
+	input := `<ac:structured-macro ac:name="toc" ac:schema-version="1"><ac:parameter ac:name="title"></ac:parameter></ac:structured-macro>`
+	tokens, err := TokenizeConfluenceXML(input)
+	require.NoError(t, err)
+
+	var foundParam bool
+	for _, tok := range tokens {
+		if tok.Type == XMLTokenParameter && tok.ParamName == "title" {
+			foundParam = true
+			assert.Equal(t, "", tok.Value)
+		}
+	}
+	assert.True(t, foundParam, "should find empty parameter")
+}
+
+func TestTokenizeConfluenceXML_EmptyRichTextBody(t *testing.T) {
+	input := `<ac:structured-macro ac:name="info" ac:schema-version="1"><ac:rich-text-body></ac:rich-text-body></ac:structured-macro>`
+	tokens, err := TokenizeConfluenceXML(input)
+	require.NoError(t, err)
+
+	// Open, body open, body close, close = 4 tokens (no text between body tags)
+	bodyOpenCount := 0
+	bodyCloseCount := 0
+	for _, tok := range tokens {
+		if tok.Type == XMLTokenBody {
+			bodyOpenCount++
+		}
+		if tok.Type == XMLTokenBodyEnd {
+			bodyCloseCount++
+		}
+	}
+	assert.Equal(t, 1, bodyOpenCount)
+	assert.Equal(t, 1, bodyCloseCount)
+}
+
+func TestTokenizeConfluenceXML_MacroNameCaseInsensitive(t *testing.T) {
+	inputs := []string{
+		`<ac:structured-macro ac:name="TOC" ac:schema-version="1"></ac:structured-macro>`,
+		`<ac:structured-macro ac:name="Toc" ac:schema-version="1"></ac:structured-macro>`,
+		`<ac:structured-macro ac:name="toc" ac:schema-version="1"></ac:structured-macro>`,
+	}
+
+	for _, input := range inputs {
+		t.Run(input, func(t *testing.T) {
+			tokens, err := TokenizeConfluenceXML(input)
+			require.NoError(t, err)
+			require.GreaterOrEqual(t, len(tokens), 1)
+			// All should normalize to lowercase
+			assert.Equal(t, "toc", tokens[0].MacroName)
+		})
+	}
+}
+
+func TestExtractCDATAContent(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"<![CDATA[hello]]>", "hello"},
+		{"<![CDATA[multi\nline]]>", "multi\nline"},
+		{"<![CDATA[x < 10 && y > 5]]>", "x < 10 && y > 5"},
+		{"<![CDATA[]]>", ""},
+		{"not cdata", "not cdata"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := ExtractCDATAContent(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
