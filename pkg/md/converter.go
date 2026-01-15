@@ -79,6 +79,23 @@ func preprocessMacros(markdown []byte) ([]byte, map[int]string) {
 
 // postprocessMacros replaces placeholder markers with actual macro XML.
 func postprocessMacros(html string, macros map[int]string) string {
+	// First pass: resolve any placeholders that exist within other macro values.
+	// This handles nested macros (e.g., [TOC] inside [INFO]...[/INFO]).
+	// The inner macro placeholder ends up embedded in the outer macro's XML.
+	for id, macroXML := range macros {
+		for innerId, innerXML := range macros {
+			if innerId == id {
+				continue
+			}
+			placeholder := macroPlaceholderPrefix + fmt.Sprintf("%d", innerId) + macroPlaceholderSuffix
+			if strings.Contains(macroXML, placeholder) {
+				macros[id] = strings.Replace(macroXML, placeholder, innerXML, 1)
+				macroXML = macros[id]
+			}
+		}
+	}
+
+	// Second pass: replace placeholders in the main HTML
 	for id, macroXML := range macros {
 		placeholder := macroPlaceholderPrefix + fmt.Sprintf("%d", id) + macroPlaceholderSuffix
 		// The placeholder might be wrapped in <p> tags, so handle that
