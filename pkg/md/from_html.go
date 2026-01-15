@@ -3,6 +3,7 @@ package md
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/JohannesKaufmann/html-to-markdown/v2/converter"
@@ -19,8 +20,8 @@ type ConvertOptions struct {
 
 // Placeholder markers for macro brackets (avoid html-to-markdown escaping)
 const (
-	macroOpenPrefix  = "CFMACROOPEN"
-	macroCloseSuffix = "CFMACROCLOSE"
+	placeholderOpenPrefix  = "CFMACROOPEN"
+	placeholderClosePrefix = "CFMACROCLOSE"
 )
 
 // FromConfluenceStorage converts Confluence storage format (XHTML) to markdown.
@@ -59,15 +60,6 @@ func FromConfluenceStorageWithOptions(html string, opts ConvertOptions) (string,
 	return strings.TrimSpace(markdown), nil
 }
 
-// panelMacroNames contains macro names that have body content (ac:rich-text-body)
-var panelMacroNames = map[string]bool{
-	"info":    true,
-	"warning": true,
-	"note":    true,
-	"tip":     true,
-	"expand":  true,
-}
-
 // macroPlaceholder stores the bracket syntax for a macro placeholder
 type macroPlaceholder struct {
 	openTag  string // e.g., "[INFO title=Title]"
@@ -77,8 +69,8 @@ type macroPlaceholder struct {
 // replaceMacroPlaceholders replaces placeholder markers with actual bracket syntax
 func replaceMacroPlaceholders(markdown string, macroMap map[int]macroPlaceholder) string {
 	for id, macro := range macroMap {
-		openPlaceholder := fmt.Sprintf("%s%d", macroOpenPrefix, id)
-		closePlaceholder := fmt.Sprintf("%s%d", macroCloseSuffix, id)
+		openPlaceholder := fmt.Sprintf("%s%d", placeholderOpenPrefix, id)
+		closePlaceholder := fmt.Sprintf("%s%d", placeholderClosePrefix, id)
 
 		markdown = strings.Replace(markdown, openPlaceholder, macro.openTag, 1)
 		if macro.closeTag != "" {
@@ -88,221 +80,114 @@ func replaceMacroPlaceholders(markdown string, macroMap map[int]macroPlaceholder
 	return markdown
 }
 
-// processConfluenceMacrosWithPlaceholders handles Confluence-specific macro elements.
-// If showMacros is false, macros are stripped entirely.
-// If showMacros is true, macros are replaced with placeholders that will be converted
-// to bracket syntax after markdown conversion (to avoid escaping issues).
-// Returns the processed HTML and a map of placeholder IDs to bracket syntax.
+// processConfluenceMacrosWithPlaceholders processes Confluence macros in HTML.
+// When showMacros is true, macros are converted to bracket syntax.
+// When showMacros is false, macros are stripped from output.
 func processConfluenceMacrosWithPlaceholders(html string, showMacros bool) (string, map[int]macroPlaceholder) {
-	macroMap := make(map[int]macroPlaceholder)
-	counter := 0
-
-	// First, convert code block macros to HTML pre/code elements
+	// Convert code blocks first (special handling)
 	html = convertCodeBlockMacros(html)
 
-	const openTag = "<ac:structured-macro"
-	const closeTag = "</ac:structured-macro>"
+	macroMap := make(map[int]macroPlaceholder)
 
-	// Process macros from innermost to outermost.
-	// We must use string-based parsing because regex cannot properly handle
-	// nested XML structures (it would match from outer open to inner close).
-	for {
-		startIdx, macroStr, endIdx := findInnermostMacro(html, openTag, closeTag)
-		if startIdx == -1 {
-			break
-		}
-
-		var replacement string
-		if showMacros {
-			placeholder, macro := convertMacroToPlaceholders(macroStr, counter)
-			macroMap[counter] = macro
-			counter++
-			replacement = placeholder
-		}
-
-		html = html[:startIdx] + replacement + html[endIdx:]
+	if !showMacros {
+		// Strip all macros without placeholders
+		return stripConfluenceMacros(html), macroMap
 	}
 
-	// Strip other Confluence-specific elements
-	html = stripConfluenceElements(html)
-
-	return html, macroMap
-}
-
-// findInnermostMacro finds a macro that contains no nested macros.
-// Returns the start index, the full macro string, and the end index.
-// Returns -1, "", -1 if no macro is found.
-func findInnermostMacro(html, openTag, closeTag string) (int, string, int) {
-	searchStart := 0
-
-	for searchStart < len(html) {
-		// Find next opening tag
-		openIdx := strings.Index(html[searchStart:], openTag)
-		if openIdx == -1 {
-			return -1, "", -1
-		}
-		openIdx += searchStart
-
-		// Find matching closing tag (handling nesting with balanced counting)
-		closeIdx := findMatchingCloseTag(html, openIdx, openTag, closeTag)
-		if closeIdx == -1 {
-			return -1, "", -1
-		}
-
-		macroStr := html[openIdx:closeIdx]
-
-		// Check if this macro contains nested macros
-		// Look for openTag after the initial tag's closing >
-		tagEndIdx := strings.Index(macroStr, ">")
-		if tagEndIdx == -1 {
-			searchStart = openIdx + 1
-			continue
-		}
-
-		innerContent := macroStr[tagEndIdx+1:]
-		if !strings.Contains(innerContent, openTag) {
-			// No nested macros - this is innermost
-			return openIdx, macroStr, closeIdx
-		}
-
-		// Has nested macros, continue searching from inside this macro
-		// to find the innermost one
-		searchStart = openIdx + tagEndIdx + 1
+	// Parse the XML to extract macros
+	result, err := ParseConfluenceXML(html)
+	if err != nil {
+		return html, macroMap
 	}
 
-	return -1, "", -1
+	// Build output with placeholders
+	var output strings.Builder
+	var macroIDCounter macroIDTracker
+
+	for _, seg := range result.Segments {
+		switch seg.Type {
+		case SegmentText:
+			output.WriteString(seg.Text)
+		case SegmentMacro:
+			// Recursively process macro and nested macros
+			macroIDCounter.addMacrosWithPlaceholders(seg.Macro, &output, macroMap)
+		}
+	}
+
+	return output.String(), macroMap
 }
 
-// findMatchingCloseTag finds the matching close tag for an open tag at openIdx,
-// properly handling nested tags using balanced parentheses counting.
-func findMatchingCloseTag(html string, openIdx int, openTag, closeTag string) int {
-	depth := 1
-	pos := openIdx + len(openTag)
+// macroIDTracker tracks IDs for macro placeholders during recursive processing
+type macroIDTracker struct {
+	nextID int
+}
 
-	for pos < len(html) && depth > 0 {
-		remaining := html[pos:]
+// addMacrosWithPlaceholders recursively adds a macro and its nested macros to the output as placeholders
+func (t *macroIDTracker) addMacrosWithPlaceholders(node *MacroNode, output *strings.Builder, macroMap map[int]macroPlaceholder) {
+	currentID := t.nextID
+	t.nextID++
 
-		nextOpen := strings.Index(remaining, openTag)
-		nextClose := strings.Index(remaining, closeTag)
+	// Create placeholder for this macro
+	placeholder := renderMacroToPlaceholders(node, currentID)
+	macroMap[currentID] = placeholder
 
-		if nextClose == -1 {
-			// No closing tag found - malformed
-			return -1
-		}
+	// Add opening placeholder
+	output.WriteString(placeholderOpenPrefix + strconv.Itoa(currentID))
 
-		if nextOpen != -1 && nextOpen < nextClose {
-			// Found another opening tag first - increase depth
-			depth++
-			pos += nextOpen + len(openTag)
+	// If macro has body, process it
+	macroType, _ := LookupMacro(node.Name)
+	if macroType.HasBody {
+		// The body contains the HTML content that was between the macro tags.
+		// The parser has already extracted nested macros into the Children array.
+		// We need to interleave the body text with the nested macros.
+		if len(node.Children) > 0 {
+			// Use the Children array to properly position nested macros within the body
+			output.WriteString(node.Body)
+			for _, child := range node.Children {
+				// Recursively add nested macro
+				t.addMacrosWithPlaceholders(child, output, macroMap)
+			}
 		} else {
-			// Found closing tag first - decrease depth
-			depth--
-			if depth == 0 {
-				return pos + nextClose + len(closeTag)
-			}
-			pos += nextClose + len(closeTag)
+			// No nested macros, just write body
+			output.WriteString(node.Body)
 		}
+		// Add closing placeholder
+		output.WriteString(placeholderClosePrefix + strconv.Itoa(currentID))
 	}
-
-	return -1
 }
 
-// convertMacroToPlaceholders converts a Confluence macro to placeholder markers.
-// Returns the placeholder HTML and the bracket syntax to substitute later.
-func convertMacroToPlaceholders(match string, id int) (string, macroPlaceholder) {
-	// Extract macro name
-	nameMatch := regexp.MustCompile(`ac:name="([^"]*)"`).FindStringSubmatch(match)
-	if len(nameMatch) < 2 {
-		return fmt.Sprintf("%s%d", macroOpenPrefix, id), macroPlaceholder{openTag: "[MACRO]"}
-	}
-	macroName := strings.ToUpper(nameMatch[1])
-	macroNameLower := strings.ToLower(nameMatch[1])
+// renderMacroToPlaceholders creates a macroPlaceholder from a MacroNode.
+func renderMacroToPlaceholders(node *MacroNode, id int) macroPlaceholder {
+	macroType, _ := LookupMacro(node.Name)
 
-	// Extract parameters from the macro, but only those that are direct children
-	// (not nested inside <ac:rich-text-body> which may contain other macros)
-	paramSearchArea := match
-	if bodyStart := strings.Index(match, "<ac:rich-text-body>"); bodyStart != -1 {
-		paramSearchArea = match[:bodyStart]
-	}
-	paramPattern := regexp.MustCompile(`<ac:parameter[^>]*ac:name="([^"]*)"[^>]*>([^<]*)</ac:parameter>`)
-	paramMatches := paramPattern.FindAllStringSubmatch(paramSearchArea, -1)
+	openTag := RenderMacroToBracketOpen(node)
 
-	// Build parameter string
-	var params []string
-	for _, p := range paramMatches {
-		if len(p) >= 3 {
-			paramName := strings.TrimSpace(p[1])
-			paramValue := strings.TrimSpace(p[2])
-			if paramName != "" && paramValue != "" {
-				// Quote values that contain spaces
-				if strings.Contains(paramValue, " ") {
-					paramValue = `"` + paramValue + `"`
-				}
-				params = append(params, paramName+"="+paramValue)
-			}
-		}
+	var closeTag string
+	if macroType.HasBody {
+		closeTag = "[/" + strings.ToUpper(node.Name) + "]"
 	}
 
-	// Build opening tag with parameters
-	openTag := "[" + macroName
-	if len(params) > 0 {
-		openTag += " " + strings.Join(params, " ")
+	return macroPlaceholder{
+		openTag:  openTag,
+		closeTag: closeTag,
 	}
-	openTag += "]"
-
-	openPlaceholder := fmt.Sprintf("%s%d", macroOpenPrefix, id)
-	closePlaceholder := fmt.Sprintf("%s%d", macroCloseSuffix, id)
-
-	// Check if this is a panel macro with body content
-	if panelMacroNames[macroNameLower] {
-		// Extract body content from <ac:rich-text-body>
-		bodyPattern := regexp.MustCompile(`(?s)<ac:rich-text-body>(.*?)</ac:rich-text-body>`)
-		bodyMatch := bodyPattern.FindStringSubmatch(match)
-
-		bodyContent := ""
-		if len(bodyMatch) > 1 {
-			bodyContent = strings.TrimSpace(bodyMatch[1])
-		}
-
-		closeTag := "[/" + macroName + "]"
-
-		if bodyContent == "" {
-			// Empty body - put open and close placeholders together
-			return openPlaceholder + closePlaceholder, macroPlaceholder{openTag: openTag, closeTag: closeTag}
-		}
-
-		// Body content will be converted by html-to-markdown
-		return openPlaceholder + "\n" + bodyContent + "\n" + closePlaceholder,
-			macroPlaceholder{openTag: openTag, closeTag: closeTag}
-	}
-
-	// Simple macro without body (like TOC)
-	return openPlaceholder, macroPlaceholder{openTag: openTag}
 }
 
-// stripConfluenceElements removes other Confluence-specific elements from HTML
-func stripConfluenceElements(html string) string {
-	// ac:link elements (internal Confluence links)
-	linkPattern := regexp.MustCompile(`<ac:link[^>]*>.*?</ac:link>`)
-	html = linkPattern.ReplaceAllString(html, "")
+// stripConfluenceMacros removes all Confluence structured macros from HTML.
+func stripConfluenceMacros(html string) string {
+	result, err := ParseConfluenceXML(html)
+	if err != nil {
+		return html
+	}
 
-	// ri:page references
-	pageRefPattern := regexp.MustCompile(`<ri:page[^>]*/?>`)
-	html = pageRefPattern.ReplaceAllString(html, "")
-
-	// ac:plain-text-link-body (link text)
-	linkBodyPattern := regexp.MustCompile(`<ac:plain-text-link-body><!\[CDATA\[(.*?)\]\]></ac:plain-text-link-body>`)
-	html = linkBodyPattern.ReplaceAllString(html, "$1")
-
-	// ac:parameter elements (macro parameters like minLevel, maxLevel)
-	paramPattern := regexp.MustCompile(`<ac:parameter[^>]*>.*?</ac:parameter>`)
-	html = paramPattern.ReplaceAllString(html, "")
-
-	// Self-closing ac:parameter
-	paramSelfClosingPattern := regexp.MustCompile(`<ac:parameter[^>]*/>`)
-	html = paramSelfClosingPattern.ReplaceAllString(html, "")
-
-	return html
+	var output strings.Builder
+	for _, seg := range result.Segments {
+		if seg.Type == SegmentText {
+			output.WriteString(seg.Text)
+		}
+		// Macros are silently dropped
+	}
+	return output.String()
 }
 
 // convertCodeBlockMacros converts Confluence code macro elements to HTML pre/code elements.
