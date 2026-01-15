@@ -89,7 +89,7 @@ func preprocessMacros(markdown []byte) ([]byte, map[int]string) {
 
 			// Find matching close tag if macro has body
 			if macroType.HasBody {
-				bodyText, endPos, found := findMacroBody(input, token, tokens)
+				bodyText, endPos, found := findMacroBody(input, token)
 				if found {
 					node.Body = bodyText
 					pos = endPos
@@ -162,7 +162,7 @@ func findTokenEndPos(input string, token BracketToken) int {
 
 // findMacroBody searches for the body and closing tag of a macro.
 // Returns the body text, end position, and whether a matching close tag was found.
-func findMacroBody(input string, openToken BracketToken, tokens []BracketToken) (string, int, bool) {
+func findMacroBody(input string, openToken BracketToken) (string, int, bool) {
 	// Find opening ] of the open tag
 	openTagEnd := findTokenEndPos(input, openToken)
 
