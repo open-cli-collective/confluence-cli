@@ -111,6 +111,36 @@ func RenderMacroToBracketOpen(node *MacroNode) string {
 	return sb.String()
 }
 
+// RenderMacroToBracketOpen renders just the opening bracket tag (without body or close).
+func RenderMacroToBracketOpen(node *MacroNode) string {
+	var sb strings.Builder
+	sb.WriteString("[")
+	sb.WriteString(strings.ToUpper(node.Name))
+
+	// Parameters (sorted for consistent output)
+	keys := make([]string, 0, len(node.Parameters))
+	for k := range node.Parameters {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		value := node.Parameters[key]
+		sb.WriteString(" ")
+		sb.WriteString(key)
+		sb.WriteString("=")
+		if strings.ContainsAny(value, " \t\n\"") {
+			sb.WriteString(`"`)
+			sb.WriteString(strings.ReplaceAll(value, `"`, `\"`))
+			sb.WriteString(`"`)
+		} else {
+			sb.WriteString(value)
+		}
+	}
+	sb.WriteString("]")
+	return sb.String()
+}
+
 // FormatPlaceholder creates a macro placeholder string.
 func FormatPlaceholder(id int) string {
 	return fmt.Sprintf("%s%d%s", macroPlaceholderPrefix, id, macroPlaceholderSuffix)
