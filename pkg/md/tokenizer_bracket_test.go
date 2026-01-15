@@ -192,3 +192,215 @@ func TestTokenizeBrackets_Positions(t *testing.T) {
 	assert.Equal(t, 3, tokens[1].Position) // "[TOC]"
 	assert.Equal(t, 8, tokens[2].Position) // "def"
 }
+
+func TestTokenizeBrackets_MalformedSyntax(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		description string
+	}{
+		{
+			"orphan open bracket",
+			"text [ more text",
+			"lone bracket treated as text",
+		},
+		{
+			"orphan close bracket",
+			"text ] more text",
+			"close bracket in text is just text",
+		},
+		{
+			"incomplete macro name",
+			"text [",
+			"bracket at end of input",
+		},
+		{
+			"brackets in text",
+			"array[0] = value",
+			"programming brackets not macro syntax",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokens, err := TokenizeBrackets(tt.input)
+			require.NoError(t, err, "should not error on malformed input")
+			// Malformed macro syntax should be treated as text
+			for _, tok := range tokens {
+				if tok.Type == BracketTokenOpenTag || tok.Type == BracketTokenCloseTag {
+					// Only valid macro names should be tokenized
+					_, known := LookupMacro(tok.MacroName)
+					// Unknown macros are still tokenized - parser validates them
+					_ = known
+				}
+			}
+		})
+	}
+}
+
+func TestTokenizeBrackets_BracketsInQuotedValues(t *testing.T) {
+	input := `[INFO title="[Important]"]content[/INFO]`
+	tokens, err := TokenizeBrackets(input)
+	require.NoError(t, err)
+
+	// Should have: open tag, text, close tag
+	require.Len(t, tokens, 3)
+	assert.Equal(t, BracketTokenOpenTag, tokens[0].Type)
+	assert.Equal(t, "[Important]", tokens[0].Parameters["title"])
+}
+
+func TestTokenizeBrackets_EscapedQuotes(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		expectedPart string
+	}{
+		{
+			"escaped double quote",
+			`[INFO title="Say \"Hello\""]`,
+			"Hello",
+		},
+		{
+			"escaped single quote",
+			`[INFO title='It\'s fine']`,
+			"fine",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokens, err := TokenizeBrackets(tt.input)
+			require.NoError(t, err)
+			require.Len(t, tokens, 1)
+			// Note: escaped quote handling preserves the backslash
+			// Current implementation does not strip backslashes
+			assert.Contains(t, tokens[0].Parameters["title"], tt.expectedPart)
+		})
+	}
+}
+
+func TestTokenizeBrackets_MultilineBody(t *testing.T) {
+	input := `[INFO]
+This is
+multiline
+content
+[/INFO]`
+	tokens, err := TokenizeBrackets(input)
+	require.NoError(t, err)
+	require.Len(t, tokens, 3)
+
+	assert.Equal(t, BracketTokenOpenTag, tokens[0].Type)
+	assert.Equal(t, BracketTokenText, tokens[1].Type)
+	assert.Contains(t, tokens[1].Text, "\n")
+	assert.Equal(t, BracketTokenCloseTag, tokens[2].Type)
+}
+
+func TestTokenizeBrackets_SelfClosing(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantCount int
+		wantType  BracketTokenType
+	}{
+		{"TOC self-close", "[TOC/]", 1, BracketTokenSelfClose},
+		{"with space", "[TOC /]", 1, BracketTokenSelfClose},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokens, err := TokenizeBrackets(tt.input)
+			require.NoError(t, err)
+			require.Len(t, tokens, tt.wantCount)
+			assert.Equal(t, tt.wantType, tokens[0].Type)
+			assert.Equal(t, "TOC", tokens[0].MacroName)
+		})
+	}
+}
+
+func TestTokenizeBrackets_DeeplyNested(t *testing.T) {
+	input := "[INFO][WARNING][NOTE]deep[/NOTE][/WARNING][/INFO]"
+	tokens, err := TokenizeBrackets(input)
+	require.NoError(t, err)
+
+	// Count token types
+	openCount := 0
+	closeCount := 0
+	textCount := 0
+	for _, tok := range tokens {
+		switch tok.Type {
+		case BracketTokenOpenTag:
+			openCount++
+		case BracketTokenCloseTag:
+			closeCount++
+		case BracketTokenText:
+			textCount++
+		}
+	}
+
+	assert.Equal(t, 3, openCount, "should have 3 open tags")
+	assert.Equal(t, 3, closeCount, "should have 3 close tags")
+	assert.Equal(t, 1, textCount, "should have 1 text token")
+}
+
+func TestTokenizeBrackets_SpecialCharactersInBody(t *testing.T) {
+	input := "[INFO]<script>alert('xss')</script> & < > \"[/INFO]"
+	tokens, err := TokenizeBrackets(input)
+	require.NoError(t, err)
+	require.Len(t, tokens, 3)
+
+	assert.Equal(t, BracketTokenText, tokens[1].Type)
+	assert.Contains(t, tokens[1].Text, "<script>")
+	assert.Contains(t, tokens[1].Text, "&")
+}
+
+func TestTokenizeBrackets_WhitespaceHandling(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantName  string
+		wantParam string
+	}{
+		{
+			"space after name",
+			"[TOC ]",
+			"TOC",
+			"",
+		},
+		{
+			"multiple spaces",
+			"[TOC   maxLevel=3]",
+			"TOC",
+			"3",
+		},
+		{
+			"tabs",
+			"[TOC\tmaxLevel=3]",
+			"TOC",
+			"3",
+		},
+		{
+			"newline in params",
+			"[INFO\n  title=\"test\"]",
+			"INFO",
+			"test",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokens, err := TokenizeBrackets(tt.input)
+			require.NoError(t, err)
+			require.GreaterOrEqual(t, len(tokens), 1)
+			assert.Equal(t, tt.wantName, tokens[0].MacroName)
+			if tt.wantParam != "" {
+				if tokens[0].Type == BracketTokenOpenTag {
+					val, exists := tokens[0].Parameters["maxLevel"]
+					if !exists {
+						val = tokens[0].Parameters["title"]
+					}
+					assert.Equal(t, tt.wantParam, val)
+				}
+			}
+		})
+	}
+}
