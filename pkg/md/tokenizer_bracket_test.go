@@ -251,19 +251,24 @@ func TestTokenizeBrackets_BracketsInQuotedValues(t *testing.T) {
 
 func TestTokenizeBrackets_EscapedQuotes(t *testing.T) {
 	tests := []struct {
-		name         string
-		input        string
-		expectedPart string
+		name     string
+		input    string
+		expected string
 	}{
 		{
 			"escaped double quote",
 			`[INFO title="Say \"Hello\""]`,
-			"Hello",
+			`Say "Hello"`,
 		},
 		{
 			"escaped single quote",
 			`[INFO title='It\'s fine']`,
-			"fine",
+			`It's fine`,
+		},
+		{
+			"escaped quote in middle",
+			`[INFO msg="value \"with\" quotes"]`,
+			`value "with" quotes`,
 		},
 	}
 
@@ -272,9 +277,14 @@ func TestTokenizeBrackets_EscapedQuotes(t *testing.T) {
 			tokens, err := TokenizeBrackets(tt.input)
 			require.NoError(t, err)
 			require.Len(t, tokens, 1)
-			// Note: escaped quote handling preserves the backslash
-			// Current implementation does not strip backslashes
-			assert.Contains(t, tokens[0].Parameters["title"], tt.expectedPart)
+			// Escaped quotes should be unescaped in the returned value
+			var actual string
+			if val, ok := tokens[0].Parameters["title"]; ok {
+				actual = val
+			} else if val, ok := tokens[0].Parameters["msg"]; ok {
+				actual = val
+			}
+			assert.Equal(t, tt.expected, actual, "parameter value should have unescaped quotes")
 		})
 	}
 }
@@ -297,13 +307,40 @@ content
 
 func TestTokenizeBrackets_SelfClosing(t *testing.T) {
 	tests := []struct {
-		name      string
-		input     string
-		wantCount int
-		wantType  BracketTokenType
+		name       string
+		input      string
+		wantCount  int
+		wantType   BracketTokenType
+		wantParams map[string]string
 	}{
-		{"TOC self-close", "[TOC/]", 1, BracketTokenSelfClose},
-		{"with space", "[TOC /]", 1, BracketTokenSelfClose},
+		{
+			"TOC self-close",
+			"[TOC/]",
+			1,
+			BracketTokenSelfClose,
+			map[string]string{},
+		},
+		{
+			"with space",
+			"[TOC /]",
+			1,
+			BracketTokenSelfClose,
+			map[string]string{},
+		},
+		{
+			"with params",
+			"[TOC maxLevel=3/]",
+			1,
+			BracketTokenSelfClose,
+			map[string]string{"maxLevel": "3"},
+		},
+		{
+			"with multiple params",
+			"[TOC maxLevel=3 minLevel=1/]",
+			1,
+			BracketTokenSelfClose,
+			map[string]string{"maxLevel": "3", "minLevel": "1"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -313,6 +350,7 @@ func TestTokenizeBrackets_SelfClosing(t *testing.T) {
 			require.Len(t, tokens, tt.wantCount)
 			assert.Equal(t, tt.wantType, tokens[0].Type)
 			assert.Equal(t, "TOC", tokens[0].MacroName)
+			assert.Equal(t, tt.wantParams, tokens[0].Parameters)
 		})
 	}
 }

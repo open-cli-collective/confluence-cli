@@ -121,13 +121,28 @@ func parseBracketTag(input string, pos int) (BracketToken, int, error) {
 		}, pos, nil
 	}
 
-	// Parse parameters until ']'
+	// Parse parameters until ']' or '/'
 	paramStart := pos
 	params, endPos, err := parseParametersUntilClose(input, pos)
 	if err != nil {
 		return BracketToken{}, startPos, err
 	}
 	_ = paramStart // used for debugging if needed
+
+	// Check if this is a self-closing tag with parameters (e.g., [TOC maxLevel=3/])
+	if endPos < len(input) && input[endPos] == '/' {
+		endPos++ // skip '/'
+		if endPos >= len(input) || input[endPos] != ']' {
+			return BracketToken{}, startPos, fmt.Errorf("expected ']' after '/'")
+		}
+		endPos++ // skip ']'
+		return BracketToken{
+			Type:       BracketTokenSelfClose,
+			MacroName:  strings.ToUpper(macroName),
+			Parameters: params,
+			Position:   startPos,
+		}, endPos, nil
+	}
 
 	return BracketToken{
 		Type:       BracketTokenOpenTag,
@@ -201,6 +216,7 @@ func parseParametersUntilClose(input string, pos int) (map[string]string, int, e
 }
 
 // parseParamValue parses a parameter value, handling quoted strings.
+// Escaped quotes (\' or \") are unescaped in the returned value.
 func parseParamValue(input string, pos int) (string, int, error) {
 	if pos >= len(input) {
 		return "", pos, fmt.Errorf("unexpected end of input")
@@ -211,16 +227,26 @@ func parseParamValue(input string, pos int) (string, int, error) {
 		quoteChar := input[pos]
 		pos++ // skip opening quote
 		valueStart := pos
+		var value strings.Builder
 
 		for pos < len(input) {
 			if input[pos] == quoteChar {
-				value := input[valueStart:pos]
+				// Append any remaining unescaped content
+				if valueStart < pos {
+					value.WriteString(input[valueStart:pos])
+				}
 				pos++ // skip closing quote
-				return value, pos, nil
+				return value.String(), pos, nil
 			}
 			// Handle escaped quotes
 			if input[pos] == '\\' && pos+1 < len(input) && input[pos+1] == quoteChar {
-				pos += 2
+				// Append content up to the backslash, skip the backslash, and continue
+				if valueStart < pos {
+					value.WriteString(input[valueStart:pos])
+				}
+				value.WriteByte(quoteChar) // write the unescaped quote
+				pos += 2                   // skip backslash and quote
+				valueStart = pos
 				continue
 			}
 			pos++
