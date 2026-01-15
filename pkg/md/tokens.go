@@ -5,10 +5,10 @@ package md
 type BracketTokenType int
 
 const (
-	BracketTokenText       BracketTokenType = iota // plain text between macros
-	BracketTokenOpenTag                            // [MACRO] or [MACRO params]
-	BracketTokenCloseTag                           // [/MACRO]
-	BracketTokenSelfClose                          // [MACRO/] (no body)
+	BracketTokenText      BracketTokenType = iota // plain text between macros
+	BracketTokenOpenTag                           // [MACRO] or [MACRO params]
+	BracketTokenCloseTag                          // [/MACRO]
+	BracketTokenSelfClose                         // [MACRO/] (no body)
 )
 
 // BracketToken represents a single token from bracket syntax parsing.
@@ -35,9 +35,9 @@ const (
 // XMLToken represents a single token from Confluence XML parsing.
 type XMLToken struct {
 	Type      XMLTokenType
-	MacroName string   // set for OpenTag
-	ParamName string   // set for Parameter
-	Value     string   // parameter value or body type ("rich-text" or "plain-text")
-	Text      string   // set for Text tokens
-	Position  int      // byte offset in original input
+	MacroName string // set for OpenTag
+	ParamName string // set for Parameter
+	Value     string // parameter value or body type ("rich-text" or "plain-text")
+	Text      string // set for Text tokens
+	Position  int    // byte offset in original input
 }

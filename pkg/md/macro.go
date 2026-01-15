@@ -15,8 +15,8 @@ type MacroNode struct {
 type BodyType string
 
 const (
-	BodyTypeNone      BodyType = ""          // no body (e.g., TOC)
-	BodyTypeRichText  BodyType = "rich-text" // HTML content (e.g., panels)
+	BodyTypeNone      BodyType = ""           // no body (e.g., TOC)
+	BodyTypeRichText  BodyType = "rich-text"  // HTML content (e.g., panels)
 	BodyTypePlainText BodyType = "plain-text" // CDATA content (e.g., code)
 )
 
