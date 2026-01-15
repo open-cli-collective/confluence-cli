@@ -1,6 +1,7 @@
 package md
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -104,6 +105,23 @@ func TestRenderMacroToBracket_QuotedValues(t *testing.T) {
 	bracket := RenderMacroToBracket(node)
 
 	assert.Contains(t, bracket, `title="Hello World"`)
+}
+
+func TestRenderMacroToBracketOpen_SimpleTOC(t *testing.T) {
+	node := &MacroNode{Name: "toc"}
+	bracket := RenderMacroToBracketOpen(node)
+	assert.Equal(t, "[TOC]", bracket)
+}
+
+func TestRenderMacroToBracketOpen_WithParams(t *testing.T) {
+	node := &MacroNode{
+		Name:       "info",
+		Parameters: map[string]string{"title": "Hello World"},
+	}
+	bracket := RenderMacroToBracketOpen(node)
+	assert.Contains(t, bracket, "[INFO")
+	assert.Contains(t, bracket, `title="Hello World"`)
+	assert.True(t, strings.HasSuffix(bracket, "]"))
 }
 
 func TestFormatPlaceholder(t *testing.T) {
