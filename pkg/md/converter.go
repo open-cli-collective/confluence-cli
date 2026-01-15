@@ -3,7 +3,6 @@ package md
 
 import (
 	"bytes"
-	"fmt"
 	"regexp"
 	"strings"
 
@@ -44,37 +43,178 @@ func ToConfluenceStorage(markdown []byte) (string, error) {
 // preprocessMacros replaces macro placeholders like [TOC] with unique markers.
 // Returns the processed markdown and a map of marker IDs to macro XML.
 func preprocessMacros(markdown []byte) ([]byte, map[int]string) {
-	result := string(markdown)
+	input := string(markdown)
 	macros := make(map[int]string)
 	counter := 0
 
-	// Convert [TOC] or [TOC param=value ...] to placeholder
-	// Case-insensitive matching for the macro name
-	tocPattern := regexp.MustCompile(`(?i)\[TOC(?:\s+([^\]]*))?\]`)
-	result = tocPattern.ReplaceAllStringFunc(result, func(match string) string {
-		macroXML := convertTOCMacro(match)
-		macros[counter] = macroXML
-		placeholder := macroPlaceholderPrefix + fmt.Sprintf("%d", counter) + macroPlaceholderSuffix
-		counter++
-		return placeholder
-	})
-
-	// Convert panel macros: [INFO]...[/INFO], [WARNING]...[/WARNING], etc.
-	// Go's regexp doesn't support backreferences, so we match each type separately
-	panelTypes := []string{"INFO", "WARNING", "NOTE", "TIP", "EXPAND"}
-	for _, panelType := range panelTypes {
-		// Case-insensitive matching, supports parameters like [INFO title="Title"]
-		pattern := regexp.MustCompile(`(?is)\[` + panelType + `([^\]]*)\](.*?)\[/` + panelType + `\]`)
-		result = pattern.ReplaceAllStringFunc(result, func(match string) string {
-			macroXML := convertPanelMacro(match, panelType)
-			macros[counter] = macroXML
-			placeholder := macroPlaceholderPrefix + fmt.Sprintf("%d", counter) + macroPlaceholderSuffix
-			counter++
-			return placeholder
-		})
+	// Tokenize to find macro patterns and handle them
+	tokens, err := TokenizeBrackets(input)
+	if err != nil {
+		// If tokenization fails, return original markdown unchanged
+		return markdown, macros
 	}
 
-	return []byte(result), macros
+	var outputBuf strings.Builder
+	pos := 0
+
+	for _, token := range tokens {
+		// Emit any text before this token
+		if token.Position > pos {
+			outputBuf.WriteString(input[pos:token.Position])
+			pos = token.Position
+		}
+
+		switch token.Type {
+		case BracketTokenText:
+			// Text token - just output it
+			outputBuf.WriteString(token.Text)
+			pos += len(token.Text)
+
+		case BracketTokenOpenTag:
+			// Check if this is a known macro
+			macroType, known := LookupMacro(token.MacroName)
+			if !known {
+				// Unknown macro - leave as-is in original text form
+				// Find the end position of this token and output original text
+				endPos := findTokenEndPos(input, token)
+				outputBuf.WriteString(input[token.Position:endPos])
+				pos = endPos
+				continue
+			}
+
+			// Create macro node from token
+			node := &MacroNode{
+				Name:       strings.ToLower(token.MacroName),
+				Parameters: token.Parameters,
+			}
+
+			// Find matching close tag if macro has body
+			if macroType.HasBody {
+				bodyText, endPos, found := findMacroBody(input, token, tokens)
+				if found {
+					node.Body = bodyText
+					pos = endPos
+				} else {
+					// No matching close tag found - output original text
+					endPos := findTokenEndPos(input, token)
+					outputBuf.WriteString(input[token.Position:endPos])
+					pos = endPos
+					continue
+				}
+			} else {
+				// No body macro - token ends immediately after ]
+				endPos := findTokenEndPos(input, token)
+				pos = endPos
+			}
+
+			// Convert body content from markdown to HTML
+			if macroType.HasBody && node.Body != "" {
+				var bodyBuf bytes.Buffer
+				if err := mdParser.Convert([]byte(node.Body), &bodyBuf); err == nil {
+					node.Body = bodyBuf.String()
+				} else {
+					node.Body = "<p>" + node.Body + "</p>"
+				}
+			}
+
+			// Render macro to XML
+			macroXML := RenderMacroToXML(node)
+			macros[counter] = macroXML
+
+			// Insert placeholder
+			outputBuf.WriteString(FormatPlaceholder(counter))
+			counter++
+
+		case BracketTokenCloseTag, BracketTokenSelfClose:
+			// These shouldn't appear at top level in a properly tokenized stream
+			// but if they do, treat as text
+			endPos := findTokenEndPos(input, token)
+			outputBuf.WriteString(input[token.Position:endPos])
+			pos = endPos
+		}
+	}
+
+	// Emit any remaining text
+	if pos < len(input) {
+		outputBuf.WriteString(input[pos:])
+	}
+
+	return []byte(outputBuf.String()), macros
+}
+
+// findTokenEndPos finds the end position of a token in the input.
+// For text tokens, it's position + length.
+// For bracket tokens, we need to find the closing ] or ].
+func findTokenEndPos(input string, token BracketToken) int {
+	if token.Type == BracketTokenText {
+		return token.Position + len(token.Text)
+	}
+	// For bracket tokens, find the closing ]
+	// This is a simplified approach - we look for the next ] after the position
+	pos := token.Position + 1
+	for pos < len(input) && input[pos] != ']' {
+		pos++
+	}
+	if pos < len(input) {
+		pos++ // include the ]
+	}
+	return pos
+}
+
+// findMacroBody searches for the body and closing tag of a macro.
+// Returns the body text, end position, and whether a matching close tag was found.
+func findMacroBody(input string, openToken BracketToken, tokens []BracketToken) (string, int, bool) {
+	// Find opening ] of the open tag
+	openTagEnd := findTokenEndPos(input, openToken)
+
+	// Search for close tag after the opening tag - try multiple case variations
+	// since macros are case-insensitive
+	searchText := input[openTagEnd:]
+
+	// Try to find matching close tag with case-insensitive search
+	// We need to look for [/MACRO] or [/macro] or [/Macro] etc.
+	closePosLen := 0
+
+	// Try uppercase
+	closePatternUpper := "[/" + strings.ToUpper(openToken.MacroName) + "]"
+	closePosRel := strings.Index(searchText, closePatternUpper)
+	if closePosRel != -1 {
+		closePosLen = len(closePatternUpper)
+	} else {
+		// Try lowercase
+		closePatternLower := "[/" + strings.ToLower(openToken.MacroName) + "]"
+		closePosRel = strings.Index(searchText, closePatternLower)
+		if closePosRel != -1 {
+			closePosLen = len(closePatternLower)
+		} else {
+			// Try case-insensitive search by looking for [/...] pattern and checking macro name
+			for i := 0; i < len(searchText)-2; i++ {
+				if searchText[i] == '[' && searchText[i+1] == '/' {
+					// Found potential close tag, extract name
+					j := i + 2
+					for j < len(searchText) && searchText[j] != ']' && searchText[j] != ' ' {
+						j++
+					}
+					if j < len(searchText) && searchText[j] == ']' {
+						foundName := searchText[i+2 : j]
+						if strings.EqualFold(foundName, openToken.MacroName) {
+							closePosRel = i
+							closePosLen = j - i + 1
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if closePosRel != -1 {
+		bodyText := searchText[:closePosRel]
+		closePos := openTagEnd + closePosRel + closePosLen
+		return bodyText, closePos, true
+	}
+
+	return "", openTagEnd, false
 }
 
 // postprocessMacros replaces placeholder markers with actual macro XML.
@@ -87,7 +227,7 @@ func postprocessMacros(html string, macros map[int]string) string {
 			if innerId == id {
 				continue
 			}
-			placeholder := macroPlaceholderPrefix + fmt.Sprintf("%d", innerId) + macroPlaceholderSuffix
+			placeholder := FormatPlaceholder(innerId)
 			if strings.Contains(macroXML, placeholder) {
 				macros[id] = strings.Replace(macroXML, placeholder, innerXML, 1)
 				macroXML = macros[id]
@@ -97,7 +237,7 @@ func postprocessMacros(html string, macros map[int]string) string {
 
 	// Second pass: replace placeholders in the main HTML
 	for id, macroXML := range macros {
-		placeholder := macroPlaceholderPrefix + fmt.Sprintf("%d", id) + macroPlaceholderSuffix
+		placeholder := FormatPlaceholder(id)
 		// The placeholder might be wrapped in <p> tags, so handle that
 		wrappedPlaceholder := "<p>" + placeholder + "</p>"
 		if strings.Contains(html, wrappedPlaceholder) {
