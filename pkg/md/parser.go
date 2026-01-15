@@ -2,6 +2,7 @@
 package md
 
 import (
+	"fmt"
 	"log"
 )
 
@@ -53,10 +54,7 @@ func (pr *ParseResult) AddMacroSegment(macro *MacroNode) {
 
 // AddWarning logs a warning and stores it in the result.
 func (pr *ParseResult) AddWarning(format string, args ...interface{}) {
-	msg := format
-	if len(args) > 0 {
-		msg = log.Prefix() + format // simple formatting
-	}
+	msg := fmt.Sprintf(format, args...)
 	pr.Warnings = append(pr.Warnings, msg)
 	log.Printf("WARN: "+format, args...)
 }

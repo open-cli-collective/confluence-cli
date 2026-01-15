@@ -193,8 +193,8 @@ func TestTokenizeConfluenceXML_Positions(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, tokens, 4)
 
-	assert.Equal(t, 0, tokens[0].Position)  // "abc"
-	assert.Equal(t, 3, tokens[1].Position)  // macro open
+	assert.Equal(t, 0, tokens[0].Position) // "abc"
+	assert.Equal(t, 3, tokens[1].Position) // macro open
 	// Close and "def" positions will follow
 }
 

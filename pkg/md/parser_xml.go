@@ -17,8 +17,7 @@ func ParseConfluenceXML(input string) (*ParseResult, error) {
 	result := &ParseResult{}
 	stack := []*xmlStackFrame{}
 
-	for i := 0; i < len(tokens); i++ {
-		token := tokens[i]
+	for _, token := range tokens {
 
 		switch token.Type {
 		case XMLTokenText:
