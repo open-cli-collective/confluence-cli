@@ -137,9 +137,8 @@ func (t *macroIDTracker) addMacrosWithPlaceholders(node *MacroNode, output *stri
 	// If macro has body, process it
 	macroType, _ := LookupMacro(node.Name)
 	if macroType.HasBody {
-		// The body contains the HTML content that was between the macro tags.
-		// The parser has already extracted nested macros into the Children array.
-		// We need to interleave the body text with the nested macros.
+		// The body contains the HTML content. Nested macros are appended
+		// after the body (parser extracts them into Children array).
 		if len(node.Children) > 0 {
 			// Use the Children array to properly position nested macros within the body
 			output.WriteString(node.Body)

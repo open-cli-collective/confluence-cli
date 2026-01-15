@@ -66,31 +66,8 @@ func escapeXML(s string) string {
 func RenderMacroToBracket(node *MacroNode) string {
 	var sb strings.Builder
 
-	// Opening tag
-	sb.WriteString("[")
-	sb.WriteString(strings.ToUpper(node.Name))
-
-	// Parameters (sorted for consistent output)
-	keys := make([]string, 0, len(node.Parameters))
-	for k := range node.Parameters {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, key := range keys {
-		value := node.Parameters[key]
-		sb.WriteString(" ")
-		sb.WriteString(key)
-		sb.WriteString("=")
-		if strings.ContainsAny(value, " \t\n\"") {
-			sb.WriteString(`"`)
-			sb.WriteString(strings.ReplaceAll(value, `"`, `\"`))
-			sb.WriteString(`"`)
-		} else {
-			sb.WriteString(value)
-		}
-	}
-	sb.WriteString("]")
+	// Render opening bracket with parameters
+	sb.WriteString(RenderMacroToBracketOpen(node))
 
 	// Body and close tag for macros with body
 	macroType, _ := LookupMacro(node.Name)
