@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/rianjs/confluence-cli/compare/v0.7.0...v0.8.0) (2026-01-15)
+
+
+### Features
+
+* Support common Confluence macros (TOC, panels, expand) ([#52](https://github.com/rianjs/confluence-cli/issues/52)) ([e991f9f](https://github.com/rianjs/confluence-cli/commit/e991f9f873212bf7c11bc60674df0c51dfa7f6c0))
+
 ## [0.7.0](https://github.com/rianjs/confluence-cli/compare/v0.6.0...v0.7.0) (2026-01-14)
 
 
