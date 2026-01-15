@@ -402,3 +402,29 @@ func TestFromConfluenceStorage_ComplexDocument(t *testing.T) {
 	assert.Contains(t, result, "fmt.Println")
 	assert.Contains(t, result, "[the docs](https://example.com)")
 }
+
+func TestFromConfluenceStorage_NestedMacros(t *testing.T) {
+	// Test nested TOC inside INFO panel
+	input := `<ac:structured-macro ac:name="info" ac:schema-version="1">
+<ac:rich-text-body>
+<p>Here is the table of contents:</p>
+<p><ac:structured-macro ac:name="toc" ac:schema-version="1">
+<ac:parameter ac:name="maxLevel">2</ac:parameter>
+</ac:structured-macro></p>
+</ac:rich-text-body>
+</ac:structured-macro>
+<h1>Title</h1>`
+
+	opts := ConvertOptions{ShowMacros: true}
+	result, err := FromConfluenceStorageWithOptions(input, opts)
+	require.NoError(t, err)
+
+	// Should have both INFO panel and nested TOC
+	assert.Contains(t, result, "[INFO]")
+	assert.Contains(t, result, "[/INFO]")
+	assert.Contains(t, result, "[TOC maxLevel=2]")
+	assert.Contains(t, result, "# Title")
+
+	// INFO should not have TOC's parameters
+	assert.NotContains(t, result, "[INFO maxLevel=2]")
+}

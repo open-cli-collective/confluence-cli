@@ -492,3 +492,21 @@ func TestToConfluenceStorage_PanelRoundtrip(t *testing.T) {
 	assert.Contains(t, resultXHTML, `Panel content`)
 	assert.Contains(t, resultXHTML, `</ac:rich-text-body>`)
 }
+
+func TestToConfluenceStorage_NestedMacros(t *testing.T) {
+	// Test nested TOC inside INFO panel
+	input := `[INFO]
+Check out the table of contents: [TOC]
+[/INFO]`
+
+	result, err := ToConfluenceStorage([]byte(input))
+	require.NoError(t, err)
+
+	// The result should have both the panel macro and TOC macro
+	assert.Contains(t, result, `<ac:structured-macro ac:name="info"`)
+	assert.Contains(t, result, `<ac:structured-macro ac:name="toc"`)
+
+	// Make sure placeholders are not left behind
+	assert.NotContains(t, result, "CFMACRO")
+	assert.NotContains(t, result, "END")
+}

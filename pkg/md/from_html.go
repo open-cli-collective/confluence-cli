@@ -100,26 +100,111 @@ func processConfluenceMacrosWithPlaceholders(html string, showMacros bool) (stri
 	// First, convert code block macros to HTML pre/code elements
 	html = convertCodeBlockMacros(html)
 
-	// Pattern to match remaining ac:structured-macro elements (non-code macros)
-	macroPattern := regexp.MustCompile(`(?s)<ac:structured-macro[^>]*ac:name="([^"]*)"[^>]*>.*?</ac:structured-macro>`)
+	const openTag = "<ac:structured-macro"
+	const closeTag = "</ac:structured-macro>"
 
-	if !showMacros {
-		// Strip macros entirely
-		html = macroPattern.ReplaceAllString(html, "")
-	} else {
-		// Replace with placeholder markers
-		html = macroPattern.ReplaceAllStringFunc(html, func(match string) string {
-			placeholder, macro := convertMacroToPlaceholders(match, counter)
+	// Process macros from innermost to outermost.
+	// We must use string-based parsing because regex cannot properly handle
+	// nested XML structures (it would match from outer open to inner close).
+	for {
+		startIdx, macroStr, endIdx := findInnermostMacro(html, openTag, closeTag)
+		if startIdx == -1 {
+			break
+		}
+
+		var replacement string
+		if showMacros {
+			placeholder, macro := convertMacroToPlaceholders(macroStr, counter)
 			macroMap[counter] = macro
 			counter++
-			return placeholder
-		})
+			replacement = placeholder
+		}
+
+		html = html[:startIdx] + replacement + html[endIdx:]
 	}
 
 	// Strip other Confluence-specific elements
 	html = stripConfluenceElements(html)
 
 	return html, macroMap
+}
+
+// findInnermostMacro finds a macro that contains no nested macros.
+// Returns the start index, the full macro string, and the end index.
+// Returns -1, "", -1 if no macro is found.
+func findInnermostMacro(html, openTag, closeTag string) (int, string, int) {
+	searchStart := 0
+
+	for searchStart < len(html) {
+		// Find next opening tag
+		openIdx := strings.Index(html[searchStart:], openTag)
+		if openIdx == -1 {
+			return -1, "", -1
+		}
+		openIdx += searchStart
+
+		// Find matching closing tag (handling nesting with balanced counting)
+		closeIdx := findMatchingCloseTag(html, openIdx, openTag, closeTag)
+		if closeIdx == -1 {
+			return -1, "", -1
+		}
+
+		macroStr := html[openIdx:closeIdx]
+
+		// Check if this macro contains nested macros
+		// Look for openTag after the initial tag's closing >
+		tagEndIdx := strings.Index(macroStr, ">")
+		if tagEndIdx == -1 {
+			searchStart = openIdx + 1
+			continue
+		}
+
+		innerContent := macroStr[tagEndIdx+1:]
+		if !strings.Contains(innerContent, openTag) {
+			// No nested macros - this is innermost
+			return openIdx, macroStr, closeIdx
+		}
+
+		// Has nested macros, continue searching from inside this macro
+		// to find the innermost one
+		searchStart = openIdx + tagEndIdx + 1
+	}
+
+	return -1, "", -1
+}
+
+// findMatchingCloseTag finds the matching close tag for an open tag at openIdx,
+// properly handling nested tags using balanced parentheses counting.
+func findMatchingCloseTag(html string, openIdx int, openTag, closeTag string) int {
+	depth := 1
+	pos := openIdx + len(openTag)
+
+	for pos < len(html) && depth > 0 {
+		remaining := html[pos:]
+
+		nextOpen := strings.Index(remaining, openTag)
+		nextClose := strings.Index(remaining, closeTag)
+
+		if nextClose == -1 {
+			// No closing tag found - malformed
+			return -1
+		}
+
+		if nextOpen != -1 && nextOpen < nextClose {
+			// Found another opening tag first - increase depth
+			depth++
+			pos += nextOpen + len(openTag)
+		} else {
+			// Found closing tag first - decrease depth
+			depth--
+			if depth == 0 {
+				return pos + nextClose + len(closeTag)
+			}
+			pos += nextClose + len(closeTag)
+		}
+	}
+
+	return -1
 }
 
 // convertMacroToPlaceholders converts a Confluence macro to placeholder markers.
@@ -133,9 +218,14 @@ func convertMacroToPlaceholders(match string, id int) (string, macroPlaceholder)
 	macroName := strings.ToUpper(nameMatch[1])
 	macroNameLower := strings.ToLower(nameMatch[1])
 
-	// Extract parameters from the macro
+	// Extract parameters from the macro, but only those that are direct children
+	// (not nested inside <ac:rich-text-body> which may contain other macros)
+	paramSearchArea := match
+	if bodyStart := strings.Index(match, "<ac:rich-text-body>"); bodyStart != -1 {
+		paramSearchArea = match[:bodyStart]
+	}
 	paramPattern := regexp.MustCompile(`<ac:parameter[^>]*ac:name="([^"]*)"[^>]*>([^<]*)</ac:parameter>`)
-	paramMatches := paramPattern.FindAllStringSubmatch(match, -1)
+	paramMatches := paramPattern.FindAllStringSubmatch(paramSearchArea, -1)
 
 	// Build parameter string
 	var params []string
