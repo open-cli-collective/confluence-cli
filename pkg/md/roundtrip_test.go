@@ -81,9 +81,9 @@ func TestRoundtrip_AllPanelTypes(t *testing.T) {
 	}
 }
 
-// Roundtrip tests for bug fixes - verify position is preserved through complete cycle
+// TestRoundtrip_NestedPosition verifies that nested macro position is preserved
+// through the complete MD→XHTML→MD cycle.
 func TestRoundtrip_NestedPosition(t *testing.T) {
-	// Bug 3 regression test: nested macro position should be preserved
 	input := `[INFO]
 Before
 [TOC]
@@ -175,7 +175,8 @@ More outer
 	assert.Contains(t, md, "Inner")
 }
 
-// Bug 1 regression test: close tag should not duplicate content
+// TestRoundtrip_CloseTagNotDuplicated verifies that panel content appears exactly once
+// through the MD→XHTML→MD cycle (close tag is properly consumed, not left as literal text).
 func TestRoundtrip_CloseTagNotDuplicated(t *testing.T) {
 	input := "[INFO]unique content[/INFO]"
 

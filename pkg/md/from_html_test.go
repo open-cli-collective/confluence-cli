@@ -430,8 +430,10 @@ func TestFromConfluenceStorage_NestedMacros(t *testing.T) {
 	assert.NotContains(t, result, "[INFO maxLevel=2]")
 }
 
-// Bug 3 tests: Nested macro position should be preserved in XHTML→MD direction
-func TestBug3_NestedPositionPreserved(t *testing.T) {
+// TestXHTMLToMD_NestedMacroPositionPreserved verifies that when converting XHTML back to
+// Markdown, nested macros appear at their original position in the body content (not
+// appended to the end).
+func TestXHTMLToMD_NestedMacroPositionPreserved(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       string
@@ -524,7 +526,9 @@ func findStringIndex(s, substr string) int {
 	return strings.Index(s, substr)
 }
 
-func TestBug3_NestedPositionPreserved_ExactOrder(t *testing.T) {
+// TestXHTMLToMD_NestedMacroOrderPreserved verifies exact ordering of content and nested
+// macros using index comparisons.
+func TestXHTMLToMD_NestedMacroOrderPreserved(t *testing.T) {
 	input := `<ac:structured-macro ac:name="info" ac:schema-version="1">
 <ac:rich-text-body>
 <p>Before</p>

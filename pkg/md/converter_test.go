@@ -512,8 +512,9 @@ Check out the table of contents: [TOC]
 	assert.NotContains(t, result, "END")
 }
 
-// Bug 1 tests: Close tag should be consumed, not left as text
-func TestBug1_CloseTagConsumed(t *testing.T) {
+// TestPanelMacro_CloseTagConsumed verifies that panel macro close tags like [/INFO]
+// are properly consumed during MD→XHTML conversion and don't appear as literal text.
+func TestPanelMacro_CloseTagConsumed(t *testing.T) {
 	tests := []struct {
 		name  string
 		input string
@@ -561,8 +562,10 @@ func TestBug1_CloseTagConsumed(t *testing.T) {
 	}
 }
 
-// Bug 2 tests: Nested macros should be processed correctly
-func TestBug2_NestedMacrosProcessedCorrectly(t *testing.T) {
+// TestNestedMacros_ProcessedAtCorrectLevel verifies that nested macros like [TOC] inside
+// [INFO]...[/INFO] are converted to XML at the correct nesting level (inside the parent's
+// rich-text-body), not as siblings at the top level.
+func TestNestedMacros_ProcessedAtCorrectLevel(t *testing.T) {
 	tests := []struct {
 		name              string
 		input             string
@@ -637,8 +640,9 @@ func TestBug2_NestedMacrosProcessedCorrectly(t *testing.T) {
 	}
 }
 
-// Test that TOC XML is inside INFO XML body (correct nesting)
-func TestBug2_NestedMacroPosition(t *testing.T) {
+// TestNestedMacros_XMLStructureCorrect verifies that the generated XML has correct
+// structure: nested macros appear inside the parent's rich-text-body element.
+func TestNestedMacros_XMLStructureCorrect(t *testing.T) {
 	input := "[INFO]Before [TOC] After[/INFO]"
 	result, err := ToConfluenceStorage([]byte(input))
 	require.NoError(t, err)
