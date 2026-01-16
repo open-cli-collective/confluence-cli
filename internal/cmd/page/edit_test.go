@@ -1021,3 +1021,151 @@ func TestRunEdit_TitleOnlyUpdate_NoContentValidation(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, updateCalled, "Update should have been called")
 }
+
+func TestRunEdit_MoveOnly_NoEditorOpened(t *testing.T) {
+	// Test: cfl page edit 12345 --parent 67890
+	// Verifies: page is moved without content change, no editor opened
+	moveCalled := false
+	updateCalled := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/api/v2/pages/12345"):
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": "12345",
+				"title": "Test Page",
+				"version": {"number": 1},
+				"body": {"storage": {"representation": "storage", "value": "<p>Original content</p>"}},
+				"_links": {"webui": "/pages/12345"}
+			}`))
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/api/v2/pages/12345"):
+			updateCalled = true
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": "12345",
+				"title": "Test Page",
+				"version": {"number": 2},
+				"_links": {"webui": "/pages/12345"}
+			}`))
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/rest/api/content/12345/move/append/67890"):
+			moveCalled = true
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test@example.com", "token")
+	opts := &editOptions{
+		pageID:  "12345",
+		parent:  "67890",
+		noColor: true,
+	}
+
+	err := runEdit(opts, client)
+	require.NoError(t, err)
+	assert.True(t, updateCalled, "UpdatePage should have been called")
+	assert.True(t, moveCalled, "MovePage should have been called")
+}
+
+func TestRunEdit_MoveWithTitleOnly_NoEditorOpened(t *testing.T) {
+	// Test: cfl page edit 12345 --parent 67890 --title "New Title"
+	// Verifies: page is moved and title updated, body preserved, no editor opened
+	moveCalled := false
+	var receivedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/api/v2/pages/12345"):
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": "12345",
+				"title": "Old Title",
+				"version": {"number": 1},
+				"body": {"storage": {"representation": "storage", "value": "<p>Original content</p>"}},
+				"_links": {"webui": "/pages/12345"}
+			}`))
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/api/v2/pages/12345"):
+			body, _ := io.ReadAll(r.Body)
+			json.Unmarshal(body, &receivedBody)
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": "12345",
+				"title": "New Title",
+				"version": {"number": 2},
+				"_links": {"webui": "/pages/12345"}
+			}`))
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/rest/api/content/12345/move/append/67890"):
+			moveCalled = true
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test@example.com", "token")
+	opts := &editOptions{
+		pageID:  "12345",
+		title:   "New Title",
+		parent:  "67890",
+		noColor: true,
+	}
+
+	err := runEdit(opts, client)
+	require.NoError(t, err)
+	assert.True(t, moveCalled, "MovePage should have been called")
+	assert.Equal(t, "New Title", receivedBody["title"])
+}
+
+func TestRunEdit_MoveOnly_BodyPreserved(t *testing.T) {
+	// Test: move-only operation preserves original body exactly
+	// Verifies: received body in PUT request matches original page body
+	var receivedBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && strings.Contains(r.URL.Path, "/api/v2/pages/12345"):
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": "12345",
+				"title": "Test Page",
+				"version": {"number": 1},
+				"body": {"storage": {"representation": "storage", "value": "<p>Original content that must be preserved</p>"}},
+				"_links": {"webui": "/pages/12345"}
+			}`))
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/api/v2/pages/12345"):
+			body, _ := io.ReadAll(r.Body)
+			json.Unmarshal(body, &receivedBody)
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": "12345",
+				"title": "Test Page",
+				"version": {"number": 2},
+				"_links": {"webui": "/pages/12345"}
+			}`))
+		case r.Method == "PUT" && strings.Contains(r.URL.Path, "/rest/api/content/12345/move/append/67890"):
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test@example.com", "token")
+	opts := &editOptions{
+		pageID:  "12345",
+		parent:  "67890",
+		noColor: true,
+	}
+
+	err := runEdit(opts, client)
+	require.NoError(t, err)
+
+	// Verify body was preserved from original page
+	bodyMap := receivedBody["body"].(map[string]interface{})
+	storageMap := bodyMap["storage"].(map[string]interface{})
+	assert.Equal(t, "<p>Original content that must be preserved</p>", storageMap["value"])
+}
