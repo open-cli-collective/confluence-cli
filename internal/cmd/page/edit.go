@@ -159,8 +159,8 @@ func runEdit(opts *editOptions, client *api.Client) error {
 		hasNewContent = true
 	}
 
-	// If no new content and no new title, open editor by default
-	if !hasNewContent && opts.title == "" {
+	// If no new content and no new title and no parent move, open editor by default
+	if !hasNewContent && opts.title == "" && opts.parent == "" {
 		content, isMarkdown, err := getEditContent(&editOptions{editor: true, markdown: opts.markdown}, existingPage)
 		if err != nil {
 			return err

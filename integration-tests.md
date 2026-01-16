@@ -85,6 +85,8 @@ This document catalogs the manual integration test suite for `cfl`. These tests 
 | Move with content update | `cfl page edit <id> --parent <parent-id> --file updated.md` | Page moved with new content |
 | Move to invalid parent | `cfl page edit <id> --parent 99999999999` | Error: 404 not found |
 | Move preserves history | Move page, then check version history | Previous versions still visible in UI |
+| Move page (no content change) | `cfl page edit <id> --parent <parent-id>` | Page moved without opening editor, content unchanged |
+| Move and rename (no content change) | `cfl page edit <id> --parent <parent-id> --title "New Title"` | Page moved and renamed without editor |
 | Empty content from stdin | `echo "" \| cfl page edit <id>` | Error: "page content cannot be empty" |
 | Whitespace-only from stdin | `echo "   " \| cfl page edit <id>` | Error: "page content cannot be empty" |
 
@@ -382,7 +384,9 @@ Before GA release, run through this checklist:
 - [ ] Edit page from file
 - [ ] Edit page with --legacy flag
 - [ ] Move page to new parent (`--parent` flag)
+- [ ] Move page (no content change, no editor opened)
 - [ ] Move and rename page together
+- [ ] Move and rename (no content change, no editor opened)
 - [ ] Verify page history preserved after move
 - [ ] Copy page (same space)
 - [ ] Copy page (different space)
