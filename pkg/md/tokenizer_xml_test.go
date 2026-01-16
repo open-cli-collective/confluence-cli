@@ -358,3 +358,150 @@ func TestExtractCDATAContent(t *testing.T) {
 		})
 	}
 }
+
+// Tests for self-closing macros (issue #56)
+func TestTokenizeConfluenceXML_SelfClosingMacro(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		expectedOpens  int
+		expectedCloses int
+		expectedMacros []string
+	}{
+		{
+			name:           "simple self-closing macro with space",
+			input:          `<ac:structured-macro ac:name="toc" ac:schema-version="1" />`,
+			expectedOpens:  1,
+			expectedCloses: 1,
+			expectedMacros: []string{"toc"},
+		},
+		{
+			name:           "simple self-closing macro without space",
+			input:          `<ac:structured-macro ac:name="toc" ac:schema-version="1"/>`,
+			expectedOpens:  1,
+			expectedCloses: 1,
+			expectedMacros: []string{"toc"},
+		},
+		{
+			name:           "self-closing macro in p tag",
+			input:          `<p><ac:structured-macro ac:name="toc" ac:schema-version="1" /></p>`,
+			expectedOpens:  1,
+			expectedCloses: 1,
+			expectedMacros: []string{"toc"},
+		},
+		{
+			name:           "multiple self-closing macros",
+			input:          `<ac:structured-macro ac:name="toc" /><ac:structured-macro ac:name="anchor" ac:schema-version="1" />`,
+			expectedOpens:  2,
+			expectedCloses: 2,
+			expectedMacros: []string{"toc", "anchor"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokens, err := TokenizeConfluenceXML(tt.input)
+			require.NoError(t, err)
+
+			openCount := 0
+			closeCount := 0
+			macroNames := []string{}
+			for _, tok := range tokens {
+				if tok.Type == XMLTokenOpenTag {
+					openCount++
+					macroNames = append(macroNames, tok.MacroName)
+				}
+				if tok.Type == XMLTokenCloseTag {
+					closeCount++
+				}
+			}
+
+			assert.Equal(t, tt.expectedOpens, openCount, "open tag count mismatch")
+			assert.Equal(t, tt.expectedCloses, closeCount, "close tag count mismatch")
+			for _, expected := range tt.expectedMacros {
+				assert.Contains(t, macroNames, expected, "expected macro %s not found", expected)
+			}
+		})
+	}
+}
+
+func TestTokenizeConfluenceXML_SelfClosingNestedInBodyMacro(t *testing.T) {
+	// This is the exact scenario from issue #56
+	input := `<ac:structured-macro ac:name="info" ac:schema-version="1"><ac:rich-text-body><p><ac:structured-macro ac:name="toc" ac:schema-version="1" /></p></ac:rich-text-body></ac:structured-macro>`
+
+	tokens, err := TokenizeConfluenceXML(input)
+	require.NoError(t, err)
+
+	// Expected token sequence:
+	// 1. XMLTokenOpenTag (info)
+	// 2. XMLTokenBody (rich-text)
+	// 3. XMLTokenText (<p>)
+	// 4. XMLTokenOpenTag (toc) - from self-closing
+	// 5. XMLTokenCloseTag - from self-closing
+	// 6. XMLTokenText (</p>)
+	// 7. XMLTokenBodyEnd
+	// 8. XMLTokenCloseTag (info)
+
+	openCount := 0
+	closeCount := 0
+	macroNames := []string{}
+	for _, tok := range tokens {
+		if tok.Type == XMLTokenOpenTag {
+			openCount++
+			macroNames = append(macroNames, tok.MacroName)
+		}
+		if tok.Type == XMLTokenCloseTag {
+			closeCount++
+		}
+	}
+
+	assert.Equal(t, 2, openCount, "should have 2 macro opens (info + toc)")
+	assert.Equal(t, 2, closeCount, "should have 2 macro closes (info + toc)")
+	assert.Contains(t, macroNames, "info")
+	assert.Contains(t, macroNames, "toc")
+
+	// Verify token order: info open should come before toc open
+	var infoIdx, tocIdx int
+	for i, tok := range tokens {
+		if tok.Type == XMLTokenOpenTag && tok.MacroName == "info" {
+			infoIdx = i
+		}
+		if tok.Type == XMLTokenOpenTag && tok.MacroName == "toc" {
+			tocIdx = i
+		}
+	}
+	assert.Less(t, infoIdx, tocIdx, "info should open before toc")
+}
+
+func TestTokenizeConfluenceXML_SelfClosingVsRegularMacro(t *testing.T) {
+	// Make sure regular macros still work and are distinguished from self-closing
+	regular := `<ac:structured-macro ac:name="toc" ac:schema-version="1"></ac:structured-macro>`
+	selfClosing := `<ac:structured-macro ac:name="toc" ac:schema-version="1" />`
+
+	regularTokens, err := TokenizeConfluenceXML(regular)
+	require.NoError(t, err)
+
+	selfClosingTokens, err := TokenizeConfluenceXML(selfClosing)
+	require.NoError(t, err)
+
+	// Both should have 1 open and 1 close
+	countTokens := func(tokens []XMLToken) (opens, closes int) {
+		for _, tok := range tokens {
+			if tok.Type == XMLTokenOpenTag {
+				opens++
+			}
+			if tok.Type == XMLTokenCloseTag {
+				closes++
+			}
+		}
+		return
+	}
+
+	regularOpens, regularCloses := countTokens(regularTokens)
+	selfClosingOpens, selfClosingCloses := countTokens(selfClosingTokens)
+
+	assert.Equal(t, 1, regularOpens)
+	assert.Equal(t, 1, regularCloses)
+	assert.Equal(t, 1, selfClosingOpens)
+	assert.Equal(t, 1, selfClosingCloses)
+}
