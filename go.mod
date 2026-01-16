@@ -1,4 +1,4 @@
-module github.com/rianjs/confluence-cli
+module github.com/open-cli-collective/confluence-cli
 
 go 1.24.0
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/rianjs/confluence-cli/internal/cmd/root"
+	"github.com/open-cli-collective/confluence-cli/internal/cmd/root"
 )
 
 func main() {

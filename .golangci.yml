@@ -21,7 +21,7 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/rianjs/confluence-cli
+        - github.com/open-cli-collective/confluence-cli
 
 run:
   timeout: 5m

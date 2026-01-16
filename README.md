@@ -19,19 +19,19 @@ A command-line interface for Atlassian Confluence Cloud, inspired by [jira-cli](
 ### Homebrew (macOS)
 
 ```bash
-brew tap rianjs/confluence-cli
+brew tap open-cli-collective/confluence-cli
 brew install --cask cfl
 ```
 
 ### Go Install
 
 ```bash
-go install github.com/rianjs/confluence-cli/cmd/cfl@latest
+go install github.com/open-cli-collective/confluence-cli/cmd/cfl@latest
 ```
 
 ### Binary Download
 
-Download the latest release from the [Releases page](https://github.com/rianjs/confluence-cli/releases).
+Download the latest release from the [Releases page](https://github.com/open-cli-collective/confluence-cli/releases).
 
 ## Quick Start
 

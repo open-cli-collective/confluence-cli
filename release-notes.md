@@ -5,7 +5,7 @@
 Move pages to a new parent without losing history.
 
 ### Features
-- Add `--parent` flag to `cfl page edit` to move pages to a different parent ([#42](https://github.com/rianjs/confluence-cli/issues/42))
+- Add `--parent` flag to `cfl page edit` to move pages to a different parent ([#42](https://github.com/open-cli-collective/confluence-cli/issues/42))
 
 ---
 
@@ -14,7 +14,7 @@ Move pages to a new parent without losing history.
 Add shell tab completion support for bash, zsh, fish, and PowerShell.
 
 ### Features
-- Add `cfl completion` command with subcommands for bash, zsh, fish, and PowerShell ([#43](https://github.com/rianjs/confluence-cli/issues/43))
+- Add `cfl completion` command with subcommands for bash, zsh, fish, and PowerShell ([#43](https://github.com/open-cli-collective/confluence-cli/issues/43))
 
 ---
 
@@ -23,7 +23,7 @@ Add shell tab completion support for bash, zsh, fish, and PowerShell.
 Pages now use the modern cloud editor (ADF) format by default.
 
 ### Features
-- Use cloud editor (ADF) format for page creation by default ([#39](https://github.com/rianjs/confluence-cli/issues/39))
+- Use cloud editor (ADF) format for page creation by default ([#39](https://github.com/open-cli-collective/confluence-cli/issues/39))
 - Add `--legacy` flag to create/edit pages in legacy storage format
 - Add format mismatch warning when editing cloud pages with `--legacy`
 
@@ -34,7 +34,7 @@ Pages now use the modern cloud editor (ADF) format by default.
 Adds Confluence search with CQL query support.
 
 ### Features
-- Add `cfl search` command with full-text search, space/type filters, and raw CQL support ([#36](https://github.com/rianjs/confluence-cli/issues/36))
+- Add `cfl search` command with full-text search, space/type filters, and raw CQL support ([#36](https://github.com/open-cli-collective/confluence-cli/issues/36))
 
 ---
 
@@ -43,7 +43,7 @@ Adds Confluence search with CQL query support.
 Fixes markdown table conversion when creating pages.
 
 ### Changes
-- Enable GFM table extension in markdown converter ([#30](https://github.com/rianjs/confluence-cli/issues/30))
+- Enable GFM table extension in markdown converter ([#30](https://github.com/open-cli-collective/confluence-cli/issues/30))
 
 ---
 
@@ -52,7 +52,7 @@ Fixes markdown table conversion when creating pages.
 Adds pagination metadata to JSON list output.
 
 ### Changes
-- Add `_meta` field to JSON output from list commands with `count` and `hasMore` ([#31](https://github.com/rianjs/confluence-cli/issues/31))
+- Add `_meta` field to JSON output from list commands with `count` and `hasMore` ([#31](https://github.com/open-cli-collective/confluence-cli/issues/31))
 
 ---
 
@@ -61,7 +61,7 @@ Adds pagination metadata to JSON list output.
 Adds ability to find orphaned attachments.
 
 ### Features
-- Add `--unused` flag to `attachment list` to filter for orphaned attachments ([#18](https://github.com/rianjs/confluence-cli/issues/18))
+- Add `--unused` flag to `attachment list` to filter for orphaned attachments ([#18](https://github.com/open-cli-collective/confluence-cli/issues/18))
 
 ---
 
@@ -70,7 +70,7 @@ Adds ability to find orphaned attachments.
 Fixes markdown conversion to preserve tables created in Confluence's web UI.
 
 ### Changes
-- Preserve tables in HTML to markdown conversion ([#16](https://github.com/rianjs/confluence-cli/issues/16))
+- Preserve tables in HTML to markdown conversion ([#16](https://github.com/open-cli-collective/confluence-cli/issues/16))
 
 ---
 
@@ -79,7 +79,7 @@ Fixes markdown conversion to preserve tables created in Confluence's web UI.
 Fixes markdown conversion to preserve code blocks created in Confluence's web UI.
 
 ### Changes
-- Preserve code blocks from Confluence UI pages in markdown output ([#15](https://github.com/rianjs/confluence-cli/issues/15))
+- Preserve code blocks from Confluence UI pages in markdown output ([#15](https://github.com/open-cli-collective/confluence-cli/issues/15))
 
 ---
 
@@ -88,7 +88,7 @@ Fixes markdown conversion to preserve code blocks created in Confluence's web UI
 Improves error messages when invalid page status values are provided.
 
 ### Changes
-- Reject invalid `--status` values with helpful error message ([#17](https://github.com/rianjs/confluence-cli/issues/17))
+- Reject invalid `--status` values with helpful error message ([#17](https://github.com/open-cli-collective/confluence-cli/issues/17))
 
 ---
 
@@ -97,7 +97,7 @@ Improves error messages when invalid page status values are provided.
 Fixes `page copy` when the `--space` flag is omitted.
 
 ### Changes
-- Resolve space key from spaceId for page copy ([#14](https://github.com/rianjs/confluence-cli/issues/14))
+- Resolve space key from spaceId for page copy ([#14](https://github.com/open-cli-collective/confluence-cli/issues/14))
 
 ---
 

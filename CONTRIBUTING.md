@@ -6,7 +6,7 @@ Thank you for your interest in contributing to cfl!
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/rianjs/confluence-cli.git
+   git clone https://github.com/open-cli-collective/confluence-cli.git
    cd confluence-cli
    ```
 

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/rianjs/confluence-cli/api"
+	"github.com/open-cli-collective/confluence-cli/api"
 )
 
 func TestRunList_Success(t *testing.T) {

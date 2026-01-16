@@ -4,13 +4,13 @@ package root
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/rianjs/confluence-cli/internal/cmd/attachment"
-	"github.com/rianjs/confluence-cli/internal/cmd/completion"
-	initcmd "github.com/rianjs/confluence-cli/internal/cmd/init"
-	"github.com/rianjs/confluence-cli/internal/cmd/page"
-	"github.com/rianjs/confluence-cli/internal/cmd/search"
-	"github.com/rianjs/confluence-cli/internal/cmd/space"
-	"github.com/rianjs/confluence-cli/internal/version"
+	"github.com/open-cli-collective/confluence-cli/internal/cmd/attachment"
+	"github.com/open-cli-collective/confluence-cli/internal/cmd/completion"
+	initcmd "github.com/open-cli-collective/confluence-cli/internal/cmd/init"
+	"github.com/open-cli-collective/confluence-cli/internal/cmd/page"
+	"github.com/open-cli-collective/confluence-cli/internal/cmd/search"
+	"github.com/open-cli-collective/confluence-cli/internal/cmd/space"
+	"github.com/open-cli-collective/confluence-cli/internal/version"
 )
 
 // NewCmdRoot creates the root command for cfl.
