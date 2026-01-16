@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/rianjs/confluence-cli/api"
+	"github.com/open-cli-collective/confluence-cli/api"
 )
 
 // mockListServer creates a test server for page list operations

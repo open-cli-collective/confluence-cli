@@ -25,9 +25,9 @@ builds:
         goarch: arm64
     ldflags:
       - -s -w
-      - -X github.com/rianjs/confluence-cli/internal/version.Version={{.Version}}
-      - -X github.com/rianjs/confluence-cli/internal/version.Commit={{.Commit}}
-      - -X github.com/rianjs/confluence-cli/internal/version.Date={{.Date}}
+      - -X github.com/open-cli-collective/confluence-cli/internal/version.Version={{.Version}}
+      - -X github.com/open-cli-collective/confluence-cli/internal/version.Commit={{.Commit}}
+      - -X github.com/open-cli-collective/confluence-cli/internal/version.Date={{.Date}}
 
 archives:
   - id: default
@@ -49,7 +49,7 @@ homebrew_casks:
       owner: rianjs
       name: homebrew-confluence-cli
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    homepage: https://github.com/rianjs/confluence-cli
+    homepage: https://github.com/open-cli-collective/confluence-cli
     description: "Command-line interface for Atlassian Confluence"
     binary: cfl
     hooks:

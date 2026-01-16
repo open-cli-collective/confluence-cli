@@ -8,6 +8,10 @@ import (
 
 // Regex patterns for Confluence XML elements
 var (
+	// Matches self-closing <ac:structured-macro ac:name="NAME" ... />
+	// Must be checked BEFORE macroOpenPattern to avoid incorrect matches
+	// Uses non-greedy [^>]*? to avoid over-matching across attributes
+	macroSelfClosingPattern = regexp.MustCompile(`<ac:structured-macro\s+[^>]*?ac:name="([^"]*)"[^>]*?/>`)
 	// Matches <ac:structured-macro ac:name="NAME" ...>
 	macroOpenPattern = regexp.MustCompile(`<ac:structured-macro[^>]*ac:name="([^"]*)"[^>]*>`)
 	// Matches </ac:structured-macro>
@@ -35,6 +39,25 @@ func TokenizeConfluenceXML(input string) ([]XMLToken, error) {
 	for pos < len(input) {
 		// Try to find the next macro or body tag
 		remaining := input[pos:]
+
+		// Check for self-closing macro tag (must check before regular open tag)
+		// Self-closing tags like <ac:structured-macro ac:name="toc" /> need both open and close tokens
+		if loc := macroSelfClosingPattern.FindStringSubmatchIndex(remaining); loc != nil && loc[0] == 0 {
+			macroName := remaining[loc[2]:loc[3]]
+			// Emit open tag
+			tokens = append(tokens, XMLToken{
+				Type:      XMLTokenOpenTag,
+				MacroName: strings.ToLower(macroName),
+				Position:  pos,
+			})
+			// Immediately emit close tag for self-closing
+			tokens = append(tokens, XMLToken{
+				Type:     XMLTokenCloseTag,
+				Position: pos,
+			})
+			pos += loc[1]
+			continue
+		}
 
 		// Check for macro open tag
 		if loc := macroOpenPattern.FindStringSubmatchIndex(remaining); loc != nil && loc[0] == 0 {
@@ -129,6 +152,7 @@ func TokenizeConfluenceXML(input string) ([]XMLToken, error) {
 		}
 
 		// Find the next macro-related tag
+		nextMacroSelfClosing := macroSelfClosingPattern.FindStringIndex(remaining)
 		nextMacroOpen := macroOpenPattern.FindStringIndex(remaining)
 		nextMacroClose := macroClosePattern.FindStringIndex(remaining)
 		nextParam := paramPattern.FindStringIndex(remaining)
@@ -139,7 +163,7 @@ func TokenizeConfluenceXML(input string) ([]XMLToken, error) {
 
 		// Find minimum positive start position
 		nextTagPos := len(remaining)
-		for _, loc := range [][]int{nextMacroOpen, nextMacroClose, nextParam, nextRichOpen, nextRichClose, nextPlainOpen, nextPlainClose} {
+		for _, loc := range [][]int{nextMacroSelfClosing, nextMacroOpen, nextMacroClose, nextParam, nextRichOpen, nextRichClose, nextPlainOpen, nextPlainClose} {
 			if loc != nil && loc[0] > 0 && loc[0] < nextTagPos {
 				nextTagPos = loc[0]
 			}

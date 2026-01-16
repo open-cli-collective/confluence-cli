@@ -194,3 +194,38 @@ func TestRoundtrip_CloseTagNotDuplicated(t *testing.T) {
 	// Content should appear exactly once in MD
 	assert.Equal(t, 1, strings.Count(md, "unique content"))
 }
+
+// TestRoundtrip_NestedMacroInParagraph verifies the issue #56 fix.
+// Tests that nested self-closing macros survive the MD→XHTML→MD cycle
+// even when the XHTML wraps them in <p> tags.
+func TestRoundtrip_NestedMacroInParagraph(t *testing.T) {
+	// Start with markdown containing nested macro
+	input := "[INFO]\n\n[TOC]\n\n[/INFO]\n\n# Header 1"
+
+	// Convert to XHTML
+	xhtml, err := ToConfluenceStorage([]byte(input))
+	require.NoError(t, err)
+
+	// Verify XHTML has correct structure
+	assert.Contains(t, xhtml, "ac:structured-macro")
+	assert.Contains(t, xhtml, `ac:name="info"`)
+	assert.Contains(t, xhtml, `ac:name="toc"`)
+
+	// Convert back to markdown
+	md, err := FromConfluenceStorageWithOptions(xhtml, ConvertOptions{ShowMacros: true})
+	require.NoError(t, err)
+
+	// Verify structure preserved (case-insensitive check for macro names)
+	assert.Contains(t, strings.ToUpper(md), "[INFO]")
+	assert.Contains(t, strings.ToUpper(md), "[TOC]")
+	assert.Contains(t, strings.ToUpper(md), "[/INFO]")
+	assert.Contains(t, md, "# Header 1")
+
+	// Verify nesting order is preserved
+	infoStart := strings.Index(strings.ToUpper(md), "[INFO]")
+	tocPos := strings.Index(strings.ToUpper(md), "[TOC]")
+	infoEnd := strings.Index(strings.ToUpper(md), "[/INFO]")
+
+	assert.True(t, infoStart < tocPos, "[INFO] should come before [TOC]")
+	assert.True(t, tocPos < infoEnd, "[TOC] should come before [/INFO]")
+}

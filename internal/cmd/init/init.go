@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 
-	"github.com/rianjs/confluence-cli/internal/config"
+	"github.com/open-cli-collective/confluence-cli/internal/config"
 )
 
 // NewCmdInit creates the init command.

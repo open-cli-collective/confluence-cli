@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/rianjs/confluence-cli/api"
+	"github.com/open-cli-collective/confluence-cli/api"
 )
 
 // TestSanitizeAttachmentFilename validates that filepath.Base correctly

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/rianjs/confluence-cli/internal/config"
+	"github.com/open-cli-collective/confluence-cli/internal/config"
 )
 
 func TestVerifyConnection_Success(t *testing.T) {

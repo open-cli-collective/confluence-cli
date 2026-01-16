@@ -48,7 +48,7 @@ pkg/md/                  → Bidirectional Markdown ↔ XHTML conversion
 - **Command factories:** `NewCmd{Name}() *cobra.Command` in each command file
 - **Options structs:** Commands collect flags into `*Options` structs before execution
 - **Run functions:** `run{Action}(opts *Options) error` contains command logic
-- **Import ordering:** Standard library, external deps, then `github.com/rianjs/confluence-cli/...` (enforced by goimports)
+- **Import ordering:** Standard library, external deps, then `github.com/open-cli-collective/confluence-cli/...` (enforced by goimports)
 
 ## Markdown Conversion
 

@@ -552,3 +552,66 @@ func TestXHTMLToMD_NestedMacroOrderPreserved(t *testing.T) {
 	assert.True(t, beforeIdx < tocIdx, "Before should come before [TOC]")
 	assert.True(t, tocIdx < afterIdx, "[TOC] should come before After")
 }
+
+// TestFromConfluenceStorage_NestedMacroInParagraph tests the exact bug scenario from issue #56.
+// When a self-closing nested macro is wrapped in a <p> tag, the parser should correctly
+// identify both macros and their nesting relationship.
+func TestFromConfluenceStorage_NestedMacroInParagraph(t *testing.T) {
+	// This is the exact XHTML structure from issue #56
+	input := `<ac:structured-macro ac:name="info" ac:schema-version="1">
+<ac:rich-text-body>
+<p><ac:structured-macro ac:name="toc" ac:schema-version="1" /></p>
+</ac:rich-text-body>
+</ac:structured-macro>
+<h1>Header 1</h1>`
+
+	opts := ConvertOptions{ShowMacros: true}
+	result, err := FromConfluenceStorageWithOptions(input, opts)
+	require.NoError(t, err)
+
+	// Should contain both INFO and TOC macros without "unclosed macro" warning
+	assert.Contains(t, result, "[INFO]", "should contain [INFO] macro")
+	assert.Contains(t, result, "[TOC]", "should contain [TOC] macro")
+	assert.Contains(t, result, "[/INFO]", "should contain [/INFO] close tag")
+	assert.Contains(t, result, "# Header 1", "should contain header")
+
+	// TOC should be inside INFO (between [INFO] and [/INFO])
+	infoStart := strings.Index(result, "[INFO]")
+	tocPos := strings.Index(result, "[TOC]")
+	infoEnd := strings.Index(result, "[/INFO]")
+
+	assert.True(t, infoStart >= 0, "[INFO] should be found")
+	assert.True(t, tocPos >= 0, "[TOC] should be found")
+	assert.True(t, infoEnd >= 0, "[/INFO] should be found")
+
+	assert.True(t, infoStart < tocPos, "[INFO] should come before [TOC]")
+	assert.True(t, tocPos < infoEnd, "[TOC] should come before [/INFO]")
+}
+
+// TestFromConfluenceStorage_MultipleSelfClosingNestedMacros tests multiple self-closing
+// macros nested inside a body macro.
+func TestFromConfluenceStorage_MultipleSelfClosingNestedMacros(t *testing.T) {
+	input := `<ac:structured-macro ac:name="info" ac:schema-version="1">
+<ac:rich-text-body>
+<p>First paragraph</p>
+<p><ac:structured-macro ac:name="toc" ac:schema-version="1" /></p>
+<p>Middle text</p>
+<p><ac:structured-macro ac:name="anchor" ac:schema-version="1"><ac:parameter ac:name="">bookmark</ac:parameter></ac:structured-macro></p>
+<p>Last paragraph</p>
+</ac:rich-text-body>
+</ac:structured-macro>`
+
+	opts := ConvertOptions{ShowMacros: true}
+	result, err := FromConfluenceStorageWithOptions(input, opts)
+	require.NoError(t, err)
+
+	// All macros should be present
+	assert.Contains(t, result, "[INFO]")
+	assert.Contains(t, result, "[TOC]")
+	assert.Contains(t, result, "[/INFO]")
+
+	// Content should be preserved
+	assert.Contains(t, result, "First paragraph")
+	assert.Contains(t, result, "Middle text")
+	assert.Contains(t, result, "Last paragraph")
+}

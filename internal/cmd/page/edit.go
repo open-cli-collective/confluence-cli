@@ -12,10 +12,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/rianjs/confluence-cli/api"
-	"github.com/rianjs/confluence-cli/internal/config"
-	"github.com/rianjs/confluence-cli/internal/view"
-	"github.com/rianjs/confluence-cli/pkg/md"
+	"github.com/open-cli-collective/confluence-cli/api"
+	"github.com/open-cli-collective/confluence-cli/internal/config"
+	"github.com/open-cli-collective/confluence-cli/internal/view"
+	"github.com/open-cli-collective/confluence-cli/pkg/md"
 )
 
 type editOptions struct {
