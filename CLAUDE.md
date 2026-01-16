@@ -52,9 +52,25 @@ pkg/md/                  → Bidirectional Markdown ↔ XHTML conversion
 
 ## Markdown Conversion
 
-The `pkg/md` package handles format conversion:
-- `converter.go`: Markdown → XHTML (uses goldmark)
-- `from_html.go`: XHTML → Markdown (uses html-to-markdown)
+The `pkg/md` package handles bidirectional format conversion with macro support:
+
+**Public API (stable):**
+- `ToConfluenceStorage(markdown []byte) (string, error)` - Markdown → XHTML
+- `FromConfluenceStorage(html string) (string, error)` - XHTML → Markdown
+- `FromConfluenceStorageWithOptions(html string, opts ConvertOptions) (string, error)`
+
+**Internal Architecture:**
+```
+converter.go      → Main entry point, coordinates preprocessing/postprocessing
+from_html.go      → XHTML→MD coordination, placeholder management
+macro.go          → MacroNode, MacroType, MacroRegistry (data model)
+tokens.go         → BracketToken, XMLToken (token definitions)
+tokenizer_*.go    → TokenizeBrackets(), TokenizeConfluenceXML()
+parser_*.go       → ParseBracketMacros(), ParseConfluenceXML()
+render.go         → RenderMacroToXML(), RenderMacroToBracket()
+```
+
+**Adding New Macros:** Add one entry to `MacroRegistry` in `macro.go`. The tokenizer/parser/render components are macro-agnostic.
 
 Format auto-detection: `.md` files → markdown, `.html/.xhtml` → storage format, stdin/editor → markdown by default.
 

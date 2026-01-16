@@ -3,8 +3,7 @@ package md
 
 import (
 	"bytes"
-	"fmt"
-	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/yuin/goldmark"
@@ -43,38 +42,86 @@ func ToConfluenceStorage(markdown []byte) (string, error) {
 
 // preprocessMacros replaces macro placeholders like [TOC] with unique markers.
 // Returns the processed markdown and a map of marker IDs to macro XML.
+//
+// Uses ParseBracketMacros to correctly handle nested macros and close tags
+// via its stack-based parser. This ensures:
+// - Close tags like [/INFO] are properly consumed (not left as text)
+// - Nested macros like [TOC] inside [INFO]...[/INFO] are correctly associated
 func preprocessMacros(markdown []byte) ([]byte, map[int]string) {
-	result := string(markdown)
+	input := string(markdown)
 	macros := make(map[int]string)
-	counter := 0
 
-	// Convert [TOC] or [TOC param=value ...] to placeholder
-	// Case-insensitive matching for the macro name
-	tocPattern := regexp.MustCompile(`(?i)\[TOC(?:\s+([^\]]*))?\]`)
-	result = tocPattern.ReplaceAllStringFunc(result, func(match string) string {
-		macroXML := convertTOCMacro(match)
-		macros[counter] = macroXML
-		placeholder := macroPlaceholderPrefix + fmt.Sprintf("%d", counter) + macroPlaceholderSuffix
-		counter++
-		return placeholder
-	})
-
-	// Convert panel macros: [INFO]...[/INFO], [WARNING]...[/WARNING], etc.
-	// Go's regexp doesn't support backreferences, so we match each type separately
-	panelTypes := []string{"INFO", "WARNING", "NOTE", "TIP", "EXPAND"}
-	for _, panelType := range panelTypes {
-		// Case-insensitive matching, supports parameters like [INFO title="Title"]
-		pattern := regexp.MustCompile(`(?is)\[` + panelType + `([^\]]*)\](.*?)\[/` + panelType + `\]`)
-		result = pattern.ReplaceAllStringFunc(result, func(match string) string {
-			macroXML := convertPanelMacro(match, panelType)
-			macros[counter] = macroXML
-			placeholder := macroPlaceholderPrefix + fmt.Sprintf("%d", counter) + macroPlaceholderSuffix
-			counter++
-			return placeholder
-		})
+	// Parse using the stack-based parser which correctly handles nesting
+	result, err := ParseBracketMacros(input)
+	if err != nil {
+		return markdown, macros
 	}
 
-	return []byte(result), macros
+	var outputBuf strings.Builder
+	counter := 0
+
+	// Process each segment from the parse result
+	for _, seg := range result.Segments {
+		switch seg.Type {
+		case SegmentText:
+			outputBuf.WriteString(seg.Text)
+		case SegmentMacro:
+			// Process macro node (handles nested children recursively)
+			processMacroNode(seg.Macro, &outputBuf, macros, &counter)
+		}
+	}
+
+	return []byte(outputBuf.String()), macros
+}
+
+// processMacroNode recursively processes a macro and its nested children.
+// It converts markdown body content to HTML and renders the macro to XML.
+//
+// The body may contain child placeholders (CFCHILD0, CFCHILD1, etc.) that
+// were inserted by ParseBracketMacros to mark where nested macros appear.
+// These are replaced with the actual macro placeholders (CFMACRO0END, etc.)
+// before converting the body markdown to HTML.
+func processMacroNode(node *MacroNode, output *strings.Builder, macros map[int]string, counter *int) {
+	macroType, _ := LookupMacro(node.Name)
+
+	// If macro has body with nested children, we need to:
+	// 1. Process each child to get its XML and placeholder ID
+	// 2. Replace CFCHILD markers with macro placeholders
+	// 3. Convert the body (with placeholders) to HTML
+	// 4. Placeholders survive and get resolved in postprocessMacros
+	if macroType.HasBody && node.Body != "" {
+		bodyWithPlaceholders := node.Body
+
+		// Process each child macro and replace CFCHILD markers with macro placeholders
+		for i, child := range node.Children {
+			// Recursively process the child (this increments counter, possibly multiple times)
+			childOutput := &strings.Builder{}
+			processMacroNode(child, childOutput, macros, counter)
+
+			// Replace the child placeholder marker with the actual placeholder written by the child.
+			// We use childOutput.String() because deeply nested macros increment the counter
+			// multiple times, so we can't rely on a pre-captured counter value.
+			childMarker := childPlaceholderPrefix + strconv.Itoa(i)
+			bodyWithPlaceholders = strings.Replace(bodyWithPlaceholders, childMarker, childOutput.String(), 1)
+		}
+
+		// Convert body markdown to HTML (placeholders survive conversion)
+		var bodyBuf bytes.Buffer
+		if err := mdParser.Convert([]byte(bodyWithPlaceholders), &bodyBuf); err == nil {
+			node.Body = bodyBuf.String()
+		} else {
+			node.Body = "<p>" + bodyWithPlaceholders + "</p>"
+		}
+	}
+
+	// Render this macro to XML
+	macroXML := RenderMacroToXML(node)
+	currentID := *counter
+	macros[currentID] = macroXML
+	*counter++
+
+	// Insert placeholder for this macro
+	output.WriteString(FormatPlaceholder(currentID))
 }
 
 // postprocessMacros replaces placeholder markers with actual macro XML.
@@ -87,7 +134,7 @@ func postprocessMacros(html string, macros map[int]string) string {
 			if innerId == id {
 				continue
 			}
-			placeholder := macroPlaceholderPrefix + fmt.Sprintf("%d", innerId) + macroPlaceholderSuffix
+			placeholder := FormatPlaceholder(innerId)
 			if strings.Contains(macroXML, placeholder) {
 				macros[id] = strings.Replace(macroXML, placeholder, innerXML, 1)
 				macroXML = macros[id]
@@ -97,7 +144,7 @@ func postprocessMacros(html string, macros map[int]string) string {
 
 	// Second pass: replace placeholders in the main HTML
 	for id, macroXML := range macros {
-		placeholder := macroPlaceholderPrefix + fmt.Sprintf("%d", id) + macroPlaceholderSuffix
+		placeholder := FormatPlaceholder(id)
 		// The placeholder might be wrapped in <p> tags, so handle that
 		wrappedPlaceholder := "<p>" + placeholder + "</p>"
 		if strings.Contains(html, wrappedPlaceholder) {
@@ -107,104 +154,6 @@ func postprocessMacros(html string, macros map[int]string) string {
 		}
 	}
 	return html
-}
-
-// convertPanelMacro converts a [INFO]...[/INFO] style placeholder to Confluence structured macro XML.
-func convertPanelMacro(match string, panelType string) string {
-	// Extract parameters and body content
-	pattern := regexp.MustCompile(`(?is)\[` + panelType + `([^\]]*)\](.*?)\[/` + panelType + `\]`)
-	groups := pattern.FindStringSubmatch(match)
-
-	if len(groups) < 3 {
-		return match // Return unchanged if pattern doesn't match
-	}
-
-	macroName := strings.ToLower(panelType)
-	paramStr := strings.TrimSpace(groups[1])
-	bodyContent := strings.TrimSpace(groups[2])
-
-	// Parse parameters
-	var params []string
-	if paramStr != "" {
-		params = parseKeyValueParams(paramStr)
-	}
-
-	// Convert body content from markdown to HTML
-	var bodyHTML string
-	if bodyContent != "" {
-		// Use goldmark to convert the body content
-		var buf bytes.Buffer
-		if err := mdParser.Convert([]byte(bodyContent), &buf); err == nil {
-			bodyHTML = buf.String()
-		} else {
-			// Fallback: wrap in paragraph
-			bodyHTML = "<p>" + bodyContent + "</p>"
-		}
-	}
-
-	// Build the Confluence macro XML
-	var sb strings.Builder
-	sb.WriteString(`<ac:structured-macro ac:name="`)
-	sb.WriteString(macroName)
-	sb.WriteString(`" ac:schema-version="1">`)
-
-	// Add parameters
-	for _, param := range params {
-		parts := strings.SplitN(param, "=", 2)
-		if len(parts) == 2 {
-			name := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
-			sb.WriteString(`<ac:parameter ac:name="`)
-			sb.WriteString(name)
-			sb.WriteString(`">`)
-			sb.WriteString(value)
-			sb.WriteString(`</ac:parameter>`)
-		}
-	}
-
-	// Add body content
-	if bodyHTML != "" {
-		sb.WriteString(`<ac:rich-text-body>`)
-		sb.WriteString(strings.TrimSpace(bodyHTML))
-		sb.WriteString(`</ac:rich-text-body>`)
-	}
-
-	sb.WriteString(`</ac:structured-macro>`)
-
-	return sb.String()
-}
-
-// convertTOCMacro converts a [TOC ...] placeholder to Confluence structured macro XML.
-func convertTOCMacro(match string) string {
-	// Extract parameters from [TOC param1=value1 param2=value2]
-	tocPattern := regexp.MustCompile(`(?i)\[TOC(?:\s+([^\]]*))?\]`)
-	groups := tocPattern.FindStringSubmatch(match)
-
-	var params []string
-	if len(groups) > 1 && groups[1] != "" {
-		// Parse key=value pairs
-		paramStr := strings.TrimSpace(groups[1])
-		params = parseKeyValueParams(paramStr)
-	}
-
-	// Build the Confluence macro XML
-	var sb strings.Builder
-	sb.WriteString(`<ac:structured-macro ac:name="toc" ac:schema-version="1">`)
-	for _, param := range params {
-		parts := strings.SplitN(param, "=", 2)
-		if len(parts) == 2 {
-			name := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
-			sb.WriteString(`<ac:parameter ac:name="`)
-			sb.WriteString(name)
-			sb.WriteString(`">`)
-			sb.WriteString(value)
-			sb.WriteString(`</ac:parameter>`)
-		}
-	}
-	sb.WriteString(`</ac:structured-macro>`)
-
-	return sb.String()
 }
 
 // parseKeyValueParams parses a string like "key1=value1 key2=value2" into ["key1=value1", "key2=value2"].
