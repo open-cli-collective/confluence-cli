@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/open-cli-collective/confluence-cli/compare/v0.8.1...v0.9.0) (2026-01-16)
+
+
+### Features
+
+* add --content-only flag to page view for roundtrip editing ([#66](https://github.com/open-cli-collective/confluence-cli/issues/66)) ([eccc13e](https://github.com/open-cli-collective/confluence-cli/commit/eccc13eff78f711d601d0898cb022dc0cc4d1b84))
+
 ## [0.8.1](https://github.com/open-cli-collective/confluence-cli/compare/v0.8.0...v0.8.1) (2026-01-16)
 
 
