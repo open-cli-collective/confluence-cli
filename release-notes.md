@@ -1,5 +1,46 @@
 # Release Notes
 
+## v0.9.0 (2026-01-16)
+
+Enables clean roundtrip editing for pages with macros.
+
+### Features
+- Add `--content-only` flag to `page view` to output only content without metadata headers ([#57](https://github.com/open-cli-collective/confluence-cli/issues/57))
+
+### Example
+```bash
+# Roundtrip editing with macros preserved
+cfl page view 12345 --show-macros --content-only | cfl page edit 12345 --legacy
+```
+
+---
+
+## v0.8.1 (2026-01-16)
+
+Bug fixes for page editing and content validation.
+
+### Bug Fixes
+- Allow `--parent` flag to move page without requiring content changes ([#60](https://github.com/open-cli-collective/confluence-cli/issues/60))
+- Validate empty content client-side before API call ([#59](https://github.com/open-cli-collective/confluence-cli/issues/59))
+- Correct Homebrew tap reference in installation docs
+
+---
+
+## v0.8.0 (2026-01-15)
+
+Adds roundtrip support for common Confluence macros.
+
+### Features
+- Support TOC, panel, and expand macros with bracket-style markdown syntax ([#51](https://github.com/open-cli-collective/confluence-cli/issues/51))
+  - **TOC**: `[TOC]` or `[TOC maxLevel=3]`
+  - **Panels**: `[INFO]...[/INFO]`, `[WARNING]...[/WARNING]`, `[NOTE]...[/NOTE]`, `[TIP]...[/TIP]`
+  - **Expand**: `[EXPAND title="Click"]...[/EXPAND]`
+
+### Internal
+- Refactored macro parser to tokenizer/parser architecture for maintainability
+
+---
+
 ## v0.7.0 (2026-01-14)
 
 Move pages to a new parent without losing history.
