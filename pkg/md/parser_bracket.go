@@ -2,8 +2,13 @@
 package md
 
 import (
+	"fmt"
 	"strings"
 )
+
+// childPlaceholderPrefix is used to mark where child macros appear in a parent's body.
+// Format: CFCHILD0, CFCHILD1, etc. corresponding to the index in Children array.
+const childPlaceholderPrefix = "CFCHILD"
 
 // ParseBracketMacros parses bracket macro syntax and returns a ParseResult.
 // Input: markdown with [MACRO]...[/MACRO] syntax
@@ -105,9 +110,13 @@ func ParseBracketMacros(input string) (*ParseResult, error) {
 			}
 
 			if len(stack) > 0 {
+				parent := stack[len(stack)-1]
+				// Add placeholder marker in parent's bodyContent to preserve position
+				childIndex := len(parent.node.Children)
+				placeholder := fmt.Sprintf("%s%d", childPlaceholderPrefix, childIndex)
+				parent.bodyContent += placeholder
 				// Nested - add as child
-				stack[len(stack)-1].node.Children = append(
-					stack[len(stack)-1].node.Children, node)
+				parent.node.Children = append(parent.node.Children, node)
 			} else {
 				// Top level
 				result.AddMacroSegment(node)
@@ -141,6 +150,8 @@ type stackFrame struct {
 }
 
 // closeMacro pops the current macro from the stack and adds it appropriately.
+// When adding a child to a parent, it also inserts a placeholder marker in the
+// parent's bodyContent so that the child's position is preserved.
 func closeMacro(result *ParseResult, stack *[]*stackFrame) {
 	if len(*stack) == 0 {
 		return
@@ -149,33 +160,43 @@ func closeMacro(result *ParseResult, stack *[]*stackFrame) {
 	current := (*stack)[len(*stack)-1]
 	*stack = (*stack)[:len(*stack)-1]
 
-	// Parse any nested macros in the body
+	// Parse any nested macros in the body (for body macros that may contain nested content)
+	// Note: This handles cases where the body text contains literal macro syntax that wasn't
+	// parsed during streaming (e.g., when body text is accumulated separately).
 	if current.node.Body != "" && current.macroType.HasBody {
 		nested, err := ParseBracketMacros(current.node.Body)
 		if err == nil {
-			// Extract child macros
+			// Check if the body had any nested macros (text would just be text segments)
 			for _, seg := range nested.Segments {
 				if seg.Type == SegmentMacro {
 					current.node.Children = append(current.node.Children, seg.Macro)
 				}
 			}
-			// Combine warnings
 			result.Warnings = append(result.Warnings, nested.Warnings...)
 		}
 	}
 
 	if len(*stack) > 0 {
+		parent := (*stack)[len(*stack)-1]
+		// Add placeholder marker in parent's bodyContent to preserve position
+		childIndex := len(parent.node.Children)
+		placeholder := fmt.Sprintf("%s%d", childPlaceholderPrefix, childIndex)
+		parent.bodyContent += placeholder
 		// Add as child of parent macro
-		(*stack)[len(*stack)-1].node.Children = append(
-			(*stack)[len(*stack)-1].node.Children, current.node)
+		parent.node.Children = append(parent.node.Children, current.node)
 	} else {
 		// Top level - add as segment
 		result.AddMacroSegment(current.node)
 	}
 }
 
-// reconstructBracketTag rebuilds the original bracket syntax for a token.
+// reconstructBracketTag returns the original bracket syntax for a token.
+// Uses OriginalTagText if available to preserve original formatting.
 func reconstructBracketTag(token BracketToken) string {
+	if token.OriginalTagText != "" {
+		return token.OriginalTagText
+	}
+	// Fallback to reconstruction (shouldn't happen with current tokenizer)
 	var sb strings.Builder
 	sb.WriteString("[")
 	if token.Type == BracketTokenCloseTag {

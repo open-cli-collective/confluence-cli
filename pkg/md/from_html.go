@@ -122,7 +122,8 @@ type macroIDTracker struct {
 	nextID int
 }
 
-// addMacrosWithPlaceholders recursively adds a macro and its nested macros to the output as placeholders
+// addMacrosWithPlaceholders recursively adds a macro and its nested macros to the output as placeholders.
+// The body may contain CFXMLCHILD placeholders indicating where nested macros appeared in the original XML.
 func (t *macroIDTracker) addMacrosWithPlaceholders(node *MacroNode, output *strings.Builder, macroMap map[int]macroPlaceholder) {
 	currentID := t.nextID
 	t.nextID++
@@ -137,15 +138,20 @@ func (t *macroIDTracker) addMacrosWithPlaceholders(node *MacroNode, output *stri
 	// If macro has body, process it
 	macroType, _ := LookupMacro(node.Name)
 	if macroType.HasBody {
-		// The body contains the HTML content. Nested macros are appended
-		// after the body (parser extracts them into Children array).
 		if len(node.Children) > 0 {
-			// Use the Children array to properly position nested macros within the body
-			output.WriteString(node.Body)
-			for _, child := range node.Children {
-				// Recursively add nested macro
-				t.addMacrosWithPlaceholders(child, output, macroMap)
+			// Body contains CFXMLCHILD markers where nested macros should appear.
+			// Process each child and replace its marker with the actual macro placeholder.
+			bodyWithPlaceholders := node.Body
+			for i, child := range node.Children {
+				// Recursively process the child (this registers the child in macroMap)
+				childOutput := &strings.Builder{}
+				t.addMacrosWithPlaceholders(child, childOutput, macroMap)
+
+				// Replace the child marker in the body with the child's content
+				childMarker := fmt.Sprintf("%s%d", xmlChildPlaceholderPrefix, i)
+				bodyWithPlaceholders = strings.Replace(bodyWithPlaceholders, childMarker, childOutput.String(), 1)
 			}
+			output.WriteString(bodyWithPlaceholders)
 		} else {
 			// No nested macros, just write body
 			output.WriteString(node.Body)

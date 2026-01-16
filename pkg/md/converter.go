@@ -3,6 +3,7 @@ package md
 
 import (
 	"bytes"
+	"strconv"
 	"strings"
 
 	"github.com/yuin/goldmark"
@@ -41,179 +42,86 @@ func ToConfluenceStorage(markdown []byte) (string, error) {
 
 // preprocessMacros replaces macro placeholders like [TOC] with unique markers.
 // Returns the processed markdown and a map of marker IDs to macro XML.
+//
+// Uses ParseBracketMacros to correctly handle nested macros and close tags
+// via its stack-based parser. This ensures:
+// - Close tags like [/INFO] are properly consumed (not left as text)
+// - Nested macros like [TOC] inside [INFO]...[/INFO] are correctly associated
 func preprocessMacros(markdown []byte) ([]byte, map[int]string) {
 	input := string(markdown)
 	macros := make(map[int]string)
-	counter := 0
 
-	// Tokenize to find macro patterns and handle them
-	tokens, err := TokenizeBrackets(input)
+	// Parse using the stack-based parser which correctly handles nesting
+	result, err := ParseBracketMacros(input)
 	if err != nil {
-		// If tokenization fails, return original markdown unchanged
 		return markdown, macros
 	}
 
 	var outputBuf strings.Builder
-	pos := 0
+	counter := 0
 
-	for _, token := range tokens {
-		// Emit any text before this token
-		if token.Position > pos {
-			outputBuf.WriteString(input[pos:token.Position])
-			pos = token.Position
+	// Process each segment from the parse result
+	for _, seg := range result.Segments {
+		switch seg.Type {
+		case SegmentText:
+			outputBuf.WriteString(seg.Text)
+		case SegmentMacro:
+			// Process macro node (handles nested children recursively)
+			processMacroNode(seg.Macro, &outputBuf, macros, &counter)
 		}
-
-		switch token.Type {
-		case BracketTokenText:
-			// Text token - just output it
-			outputBuf.WriteString(token.Text)
-			pos += len(token.Text)
-
-		case BracketTokenOpenTag:
-			// Check if this is a known macro
-			macroType, known := LookupMacro(token.MacroName)
-			if !known {
-				// Unknown macro - leave as-is in original text form
-				// Find the end position of this token and output original text
-				endPos := findTokenEndPos(input, token)
-				outputBuf.WriteString(input[token.Position:endPos])
-				pos = endPos
-				continue
-			}
-
-			// Create macro node from token
-			node := &MacroNode{
-				Name:       strings.ToLower(token.MacroName),
-				Parameters: token.Parameters,
-			}
-
-			// Find matching close tag if macro has body
-			if macroType.HasBody {
-				bodyText, endPos, found := findMacroBody(input, token)
-				if found {
-					node.Body = bodyText
-					pos = endPos
-				} else {
-					// No matching close tag found - output original text
-					endPos := findTokenEndPos(input, token)
-					outputBuf.WriteString(input[token.Position:endPos])
-					pos = endPos
-					continue
-				}
-			} else {
-				// No body macro - token ends immediately after ]
-				endPos := findTokenEndPos(input, token)
-				pos = endPos
-			}
-
-			// Convert body content from markdown to HTML
-			if macroType.HasBody && node.Body != "" {
-				var bodyBuf bytes.Buffer
-				if err := mdParser.Convert([]byte(node.Body), &bodyBuf); err == nil {
-					node.Body = bodyBuf.String()
-				} else {
-					node.Body = "<p>" + node.Body + "</p>"
-				}
-			}
-
-			// Render macro to XML
-			macroXML := RenderMacroToXML(node)
-			macros[counter] = macroXML
-
-			// Insert placeholder
-			outputBuf.WriteString(FormatPlaceholder(counter))
-			counter++
-
-		case BracketTokenCloseTag, BracketTokenSelfClose:
-			// These shouldn't appear at top level in a properly tokenized stream
-			// but if they do, treat as text
-			endPos := findTokenEndPos(input, token)
-			outputBuf.WriteString(input[token.Position:endPos])
-			pos = endPos
-		}
-	}
-
-	// Emit any remaining text
-	if pos < len(input) {
-		outputBuf.WriteString(input[pos:])
 	}
 
 	return []byte(outputBuf.String()), macros
 }
 
-// findTokenEndPos finds the end position of a token in the input.
-// For text tokens, it's position + length.
-// For bracket tokens, we need to find the closing ] or ].
-func findTokenEndPos(input string, token BracketToken) int {
-	if token.Type == BracketTokenText {
-		return token.Position + len(token.Text)
-	}
-	// For bracket tokens, find the closing ]
-	// This is a simplified approach - we look for the next ] after the position
-	pos := token.Position + 1
-	for pos < len(input) && input[pos] != ']' {
-		pos++
-	}
-	if pos < len(input) {
-		pos++ // include the ]
-	}
-	return pos
-}
+// processMacroNode recursively processes a macro and its nested children.
+// It converts markdown body content to HTML and renders the macro to XML.
+//
+// The body may contain child placeholders (CFCHILD0, CFCHILD1, etc.) that
+// were inserted by ParseBracketMacros to mark where nested macros appear.
+// These are replaced with the actual macro placeholders (CFMACRO0END, etc.)
+// before converting the body markdown to HTML.
+func processMacroNode(node *MacroNode, output *strings.Builder, macros map[int]string, counter *int) {
+	macroType, _ := LookupMacro(node.Name)
 
-// findMacroBody searches for the body and closing tag of a macro.
-// Returns the body text, end position, and whether a matching close tag was found.
-func findMacroBody(input string, openToken BracketToken) (string, int, bool) {
-	// Find opening ] of the open tag
-	openTagEnd := findTokenEndPos(input, openToken)
+	// If macro has body with nested children, we need to:
+	// 1. Process each child to get its XML and placeholder ID
+	// 2. Replace CFCHILD markers with macro placeholders
+	// 3. Convert the body (with placeholders) to HTML
+	// 4. Placeholders survive and get resolved in postprocessMacros
+	if macroType.HasBody && node.Body != "" {
+		bodyWithPlaceholders := node.Body
 
-	// Search for close tag after the opening tag - try multiple case variations
-	// since macros are case-insensitive
-	searchText := input[openTagEnd:]
+		// Process each child macro and replace CFCHILD markers with macro placeholders
+		for i, child := range node.Children {
+			// Recursively process the child (this increments counter, possibly multiple times)
+			childOutput := &strings.Builder{}
+			processMacroNode(child, childOutput, macros, counter)
 
-	// Try to find matching close tag with case-insensitive search
-	// We need to look for [/MACRO] or [/macro] or [/Macro] etc.
-	closePosLen := 0
+			// Replace the child placeholder marker with the actual placeholder written by the child.
+			// We use childOutput.String() because deeply nested macros increment the counter
+			// multiple times, so we can't rely on a pre-captured counter value.
+			childMarker := childPlaceholderPrefix + strconv.Itoa(i)
+			bodyWithPlaceholders = strings.Replace(bodyWithPlaceholders, childMarker, childOutput.String(), 1)
+		}
 
-	// Try uppercase
-	closePatternUpper := "[/" + strings.ToUpper(openToken.MacroName) + "]"
-	closePosRel := strings.Index(searchText, closePatternUpper)
-	if closePosRel != -1 {
-		closePosLen = len(closePatternUpper)
-	} else {
-		// Try lowercase
-		closePatternLower := "[/" + strings.ToLower(openToken.MacroName) + "]"
-		closePosRel = strings.Index(searchText, closePatternLower)
-		if closePosRel != -1 {
-			closePosLen = len(closePatternLower)
+		// Convert body markdown to HTML (placeholders survive conversion)
+		var bodyBuf bytes.Buffer
+		if err := mdParser.Convert([]byte(bodyWithPlaceholders), &bodyBuf); err == nil {
+			node.Body = bodyBuf.String()
 		} else {
-			// Try case-insensitive search by looking for [/...] pattern and checking macro name
-			for i := 0; i < len(searchText)-2; i++ {
-				if searchText[i] == '[' && searchText[i+1] == '/' {
-					// Found potential close tag, extract name
-					j := i + 2
-					for j < len(searchText) && searchText[j] != ']' && searchText[j] != ' ' {
-						j++
-					}
-					if j < len(searchText) && searchText[j] == ']' {
-						foundName := searchText[i+2 : j]
-						if strings.EqualFold(foundName, openToken.MacroName) {
-							closePosRel = i
-							closePosLen = j - i + 1
-							break
-						}
-					}
-				}
-			}
+			node.Body = "<p>" + bodyWithPlaceholders + "</p>"
 		}
 	}
 
-	if closePosRel != -1 {
-		bodyText := searchText[:closePosRel]
-		closePos := openTagEnd + closePosRel + closePosLen
-		return bodyText, closePos, true
-	}
+	// Render this macro to XML
+	macroXML := RenderMacroToXML(node)
+	currentID := *counter
+	macros[currentID] = macroXML
+	*counter++
 
-	return "", openTagEnd, false
+	// Insert placeholder for this macro
+	output.WriteString(FormatPlaceholder(currentID))
 }
 
 // postprocessMacros replaces placeholder markers with actual macro XML.

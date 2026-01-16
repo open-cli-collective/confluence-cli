@@ -1,6 +1,7 @@
 package md
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -509,4 +510,149 @@ Check out the table of contents: [TOC]
 	// Make sure placeholders are not left behind
 	assert.NotContains(t, result, "CFMACRO")
 	assert.NotContains(t, result, "END")
+}
+
+// Bug 1 tests: Close tag should be consumed, not left as text
+func TestBug1_CloseTagConsumed(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "simple INFO panel",
+			input: "[INFO]content[/INFO]",
+		},
+		{
+			name:  "INFO with newlines",
+			input: "[INFO]\ncontent\n[/INFO]",
+		},
+		{
+			name:  "WARNING panel",
+			input: "[WARNING]warning content[/WARNING]",
+		},
+		{
+			name:  "NOTE panel",
+			input: "[NOTE]note content[/NOTE]",
+		},
+		{
+			name:  "mixed case close tag",
+			input: "[INFO]content[/info]",
+		},
+		{
+			name:  "lowercase open and close",
+			input: "[info]content[/info]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ToConfluenceStorage([]byte(tt.input))
+			require.NoError(t, err)
+
+			// Close tag should NOT appear as literal text
+			assert.NotContains(t, result, "[/INFO]", "literal close tag should not appear")
+			assert.NotContains(t, result, "[/info]", "literal close tag should not appear")
+			assert.NotContains(t, result, "[/WARNING]", "literal close tag should not appear")
+			assert.NotContains(t, result, "[/NOTE]", "literal close tag should not appear")
+
+			// Content should appear exactly once
+			assert.Equal(t, 1, strings.Count(result, "content"), "content should appear only once")
+		})
+	}
+}
+
+// Bug 2 tests: Nested macros should be processed correctly
+func TestBug2_NestedMacrosProcessedCorrectly(t *testing.T) {
+	tests := []struct {
+		name              string
+		input             string
+		verifyContains    []string
+		verifyNotContains []string
+	}{
+		{
+			name:  "TOC inside INFO",
+			input: "[INFO][TOC][/INFO]",
+			verifyContains: []string{
+				`ac:name="info"`,
+				`ac:name="toc"`,
+			},
+			verifyNotContains: []string{
+				"[TOC]", // should not be literal text
+				"[/INFO]",
+			},
+		},
+		{
+			name:  "TOC with text inside INFO",
+			input: "[INFO]Before [TOC] After[/INFO]",
+			verifyContains: []string{
+				`ac:name="info"`,
+				`ac:name="toc"`,
+				"Before",
+				"After",
+			},
+			verifyNotContains: []string{
+				"[TOC]",
+				"[/INFO]",
+			},
+		},
+		{
+			name:  "multiple nested macros",
+			input: "[INFO]Start [TOC] middle [TOC] end[/INFO]",
+			verifyContains: []string{
+				`ac:name="info"`,
+				"Start",
+				"middle",
+				"end",
+			},
+		},
+		{
+			name:  "deeply nested - TOC inside WARNING inside INFO",
+			input: "[INFO]Outer [WARNING]Inner [TOC][/WARNING][/INFO]",
+			verifyContains: []string{
+				`ac:name="info"`,
+				`ac:name="warning"`,
+				`ac:name="toc"`,
+				"Outer",
+				"Inner",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ToConfluenceStorage([]byte(tt.input))
+			require.NoError(t, err)
+
+			for _, expected := range tt.verifyContains {
+				assert.Contains(t, result, expected, "should contain: %s", expected)
+			}
+			for _, notExpected := range tt.verifyNotContains {
+				assert.NotContains(t, result, notExpected, "should not contain: %s", notExpected)
+			}
+
+			// No placeholders should remain
+			assert.NotContains(t, result, "CFMACRO")
+			assert.NotContains(t, result, "CFCHILD")
+		})
+	}
+}
+
+// Test that TOC XML is inside INFO XML body (correct nesting)
+func TestBug2_NestedMacroPosition(t *testing.T) {
+	input := "[INFO]Before [TOC] After[/INFO]"
+	result, err := ToConfluenceStorage([]byte(input))
+	require.NoError(t, err)
+
+	// Verify TOC is inside INFO's rich-text-body
+	infoStart := strings.Index(result, `ac:name="info"`)
+	richTextStart := strings.Index(result, `<ac:rich-text-body>`)
+	tocStart := strings.Index(result, `ac:name="toc"`)
+	richTextEnd := strings.Index(result, `</ac:rich-text-body>`)
+	// Use LastIndex for INFO's closing tag since TOC also uses </ac:structured-macro>
+	infoEnd := strings.LastIndex(result, `</ac:structured-macro>`)
+
+	assert.True(t, infoStart < richTextStart, "INFO should start before rich-text-body")
+	assert.True(t, richTextStart < tocStart, "rich-text-body should start before TOC")
+	assert.True(t, tocStart < richTextEnd, "TOC should be before rich-text-body end")
+	assert.True(t, richTextEnd < infoEnd, "rich-text-body should end before INFO")
 }

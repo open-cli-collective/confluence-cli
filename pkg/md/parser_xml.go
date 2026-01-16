@@ -2,8 +2,13 @@
 package md
 
 import (
+	"fmt"
 	"strings"
 )
+
+// xmlChildPlaceholderPrefix marks where child macros appear in a parent's body.
+// Format: CFXMLCHILD0, CFXMLCHILD1, etc. corresponding to the index in Children array.
+const xmlChildPlaceholderPrefix = "CFXMLCHILD"
 
 // ParseConfluenceXML parses Confluence storage format XML and returns a ParseResult.
 // Input: XHTML with <ac:structured-macro> elements
@@ -89,10 +94,13 @@ func ParseConfluenceXML(input string) (*ParseResult, error) {
 			}
 
 			if len(stack) > 0 {
+				parent := stack[len(stack)-1]
+				// Add placeholder marker in parent's bodyContent to preserve position
+				childIndex := len(parent.node.Children)
+				placeholder := fmt.Sprintf("%s%d", xmlChildPlaceholderPrefix, childIndex)
+				parent.bodyContent += placeholder
 				// Add as child of parent macro's body
-				stack[len(stack)-1].node.Children = append(
-					stack[len(stack)-1].node.Children, current.node)
-				// Don't add to bodyContent - children are separate
+				parent.node.Children = append(parent.node.Children, current.node)
 			} else {
 				// Top level - add as segment
 				result.AddMacroSegment(current.node)

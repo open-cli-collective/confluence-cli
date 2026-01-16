@@ -1,6 +1,7 @@
 package md
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -427,4 +428,123 @@ func TestFromConfluenceStorage_NestedMacros(t *testing.T) {
 
 	// INFO should not have TOC's parameters
 	assert.NotContains(t, result, "[INFO maxLevel=2]")
+}
+
+// Bug 3 tests: Nested macro position should be preserved in XHTML→MD direction
+func TestBug3_NestedPositionPreserved(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		verifyOrder []string // These strings should appear in this order
+		description string
+	}{
+		{
+			name: "TOC between text in INFO",
+			input: `<ac:structured-macro ac:name="info" ac:schema-version="1">
+<ac:rich-text-body>
+<p>Before</p>
+<ac:structured-macro ac:name="toc" ac:schema-version="1"></ac:structured-macro>
+<p>After</p>
+</ac:rich-text-body>
+</ac:structured-macro>`,
+			verifyOrder: []string{"Before", "[TOC]", "After"},
+			description: "TOC should be between Before and After",
+		},
+		{
+			name: "multiple nested macros maintain order",
+			input: `<ac:structured-macro ac:name="info" ac:schema-version="1">
+<ac:rich-text-body>
+<p>Start</p>
+<ac:structured-macro ac:name="toc" ac:schema-version="1"></ac:structured-macro>
+<p>Middle</p>
+<ac:structured-macro ac:name="toc" ac:schema-version="1">
+<ac:parameter ac:name="maxLevel">2</ac:parameter>
+</ac:structured-macro>
+<p>End</p>
+</ac:rich-text-body>
+</ac:structured-macro>`,
+			verifyOrder: []string{"Start", "[TOC]", "Middle", "[TOC maxLevel=2]", "End"},
+			description: "Multiple TOCs should maintain their positions",
+		},
+		{
+			name: "deeply nested macros",
+			input: `<ac:structured-macro ac:name="info" ac:schema-version="1">
+<ac:rich-text-body>
+<p>Outer start</p>
+<ac:structured-macro ac:name="warning" ac:schema-version="1">
+<ac:rich-text-body>
+<p>Inner start</p>
+<ac:structured-macro ac:name="toc" ac:schema-version="1"></ac:structured-macro>
+<p>Inner end</p>
+</ac:rich-text-body>
+</ac:structured-macro>
+<p>Outer end</p>
+</ac:rich-text-body>
+</ac:structured-macro>`,
+			verifyOrder: []string{"Outer start", "[WARNING]", "Inner start", "[TOC]", "Inner end", "[/WARNING]", "Outer end"},
+			description: "Deeply nested macros should maintain hierarchy",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := ConvertOptions{ShowMacros: true}
+			result, err := FromConfluenceStorageWithOptions(tt.input, opts)
+			require.NoError(t, err)
+
+			// Verify all expected strings are present
+			for _, expected := range tt.verifyOrder {
+				assert.Contains(t, result, expected, "should contain: %s", expected)
+			}
+
+			// Verify order: each string should come after the previous one
+			lastIdx := -1
+			for _, expected := range tt.verifyOrder {
+				idx := findStringIndex(result, expected)
+				if idx == -1 {
+					t.Errorf("string %q not found in result", expected)
+					continue
+				}
+				if idx <= lastIdx {
+					t.Errorf("order violation: %q (at %d) should come after position %d. %s", expected, idx, lastIdx, tt.description)
+				}
+				lastIdx = idx
+			}
+
+			// No placeholders should remain
+			assert.NotContains(t, result, "CFXMLCHILD", "XML child placeholders should be replaced")
+			assert.NotContains(t, result, "CFMACROOPEN", "Macro placeholders should be replaced")
+			assert.NotContains(t, result, "CFMACROCLOSE", "Macro placeholders should be replaced")
+		})
+	}
+}
+
+// Helper function to find the first occurrence of a substring
+func findStringIndex(s, substr string) int {
+	return strings.Index(s, substr)
+}
+
+func TestBug3_NestedPositionPreserved_ExactOrder(t *testing.T) {
+	input := `<ac:structured-macro ac:name="info" ac:schema-version="1">
+<ac:rich-text-body>
+<p>Before</p>
+<ac:structured-macro ac:name="toc" ac:schema-version="1"></ac:structured-macro>
+<p>After</p>
+</ac:rich-text-body>
+</ac:structured-macro>`
+
+	opts := ConvertOptions{ShowMacros: true}
+	result, err := FromConfluenceStorageWithOptions(input, opts)
+	require.NoError(t, err)
+
+	beforeIdx := strings.Index(result, "Before")
+	tocIdx := strings.Index(result, "[TOC]")
+	afterIdx := strings.Index(result, "After")
+
+	assert.True(t, beforeIdx >= 0, "Before should be found")
+	assert.True(t, tocIdx >= 0, "[TOC] should be found")
+	assert.True(t, afterIdx >= 0, "After should be found")
+
+	assert.True(t, beforeIdx < tocIdx, "Before should come before [TOC]")
+	assert.True(t, tocIdx < afterIdx, "[TOC] should come before After")
 }

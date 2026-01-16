@@ -13,11 +13,13 @@ const (
 
 // BracketToken represents a single token from bracket syntax parsing.
 type BracketToken struct {
-	Type       BracketTokenType
-	MacroName  string            // set for OpenTag, CloseTag, SelfClose
-	Parameters map[string]string // set for OpenTag, SelfClose
-	Text       string            // set for Text tokens
-	Position   int               // byte offset in original input
+	Type            BracketTokenType
+	MacroName       string            // set for OpenTag, CloseTag, SelfClose (uppercase for matching)
+	OriginalName    string            // set for OpenTag, CloseTag, SelfClose (original case for reconstruction)
+	Parameters      map[string]string // set for OpenTag, SelfClose
+	Text            string            // set for Text tokens
+	Position        int               // byte offset in original input
+	OriginalTagText string            // the full original bracket text for unknown macro reconstruction
 }
 
 // XMLTokenType represents token types for Confluence XML parsing.

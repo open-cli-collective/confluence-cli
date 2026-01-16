@@ -94,9 +94,11 @@ func parseBracketTag(input string, pos int) (BracketToken, int, error) {
 		}
 		pos++ // skip ']'
 		return BracketToken{
-			Type:      BracketTokenCloseTag,
-			MacroName: strings.ToUpper(macroName),
-			Position:  startPos,
+			Type:            BracketTokenCloseTag,
+			MacroName:       strings.ToUpper(macroName),
+			OriginalName:    macroName,
+			OriginalTagText: input[startPos:pos],
+			Position:        startPos,
 		}, pos, nil
 	}
 
@@ -114,10 +116,12 @@ func parseBracketTag(input string, pos int) (BracketToken, int, error) {
 		}
 		pos++ // skip ']'
 		return BracketToken{
-			Type:       BracketTokenSelfClose,
-			MacroName:  strings.ToUpper(macroName),
-			Parameters: make(map[string]string),
-			Position:   startPos,
+			Type:            BracketTokenSelfClose,
+			MacroName:       strings.ToUpper(macroName),
+			OriginalName:    macroName,
+			Parameters:      make(map[string]string),
+			OriginalTagText: input[startPos:pos],
+			Position:        startPos,
 		}, pos, nil
 	}
 
@@ -137,18 +141,22 @@ func parseBracketTag(input string, pos int) (BracketToken, int, error) {
 		}
 		endPos++ // skip ']'
 		return BracketToken{
-			Type:       BracketTokenSelfClose,
-			MacroName:  strings.ToUpper(macroName),
-			Parameters: params,
-			Position:   startPos,
+			Type:            BracketTokenSelfClose,
+			MacroName:       strings.ToUpper(macroName),
+			OriginalName:    macroName,
+			Parameters:      params,
+			OriginalTagText: input[startPos:endPos],
+			Position:        startPos,
 		}, endPos, nil
 	}
 
 	return BracketToken{
-		Type:       BracketTokenOpenTag,
-		MacroName:  strings.ToUpper(macroName),
-		Parameters: params,
-		Position:   startPos,
+		Type:            BracketTokenOpenTag,
+		MacroName:       strings.ToUpper(macroName),
+		OriginalName:    macroName,
+		Parameters:      params,
+		OriginalTagText: input[startPos:endPos],
+		Position:        startPos,
 	}, endPos, nil
 }
 

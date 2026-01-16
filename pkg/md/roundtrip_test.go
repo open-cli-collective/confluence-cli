@@ -80,3 +80,116 @@ func TestRoundtrip_AllPanelTypes(t *testing.T) {
 		})
 	}
 }
+
+// Roundtrip tests for bug fixes - verify position is preserved through complete cycle
+func TestRoundtrip_NestedPosition(t *testing.T) {
+	// Bug 3 regression test: nested macro position should be preserved
+	input := `[INFO]
+Before
+[TOC]
+After
+[/INFO]`
+
+	// MD → XHTML
+	xhtml, err := ToConfluenceStorage([]byte(input))
+	require.NoError(t, err)
+
+	// XHTML → MD
+	md, err := FromConfluenceStorageWithOptions(xhtml, ConvertOptions{ShowMacros: true})
+	require.NoError(t, err)
+
+	// Verify order is preserved: Before < TOC < After
+	beforeIdx := strings.Index(md, "Before")
+	tocIdx := strings.Index(strings.ToUpper(md), "[TOC")
+	afterIdx := strings.Index(md, "After")
+
+	assert.True(t, beforeIdx >= 0, "Before should be present")
+	assert.True(t, tocIdx >= 0, "TOC should be present")
+	assert.True(t, afterIdx >= 0, "After should be present")
+
+	assert.True(t, beforeIdx < tocIdx, "Before should come before TOC")
+	assert.True(t, tocIdx < afterIdx, "TOC should come before After")
+}
+
+func TestRoundtrip_MultipleNestedMacros(t *testing.T) {
+	input := `[INFO]
+Start
+[TOC]
+Middle
+[TOC maxLevel=2]
+End
+[/INFO]`
+
+	// MD → XHTML
+	xhtml, err := ToConfluenceStorage([]byte(input))
+	require.NoError(t, err)
+
+	// XHTML → MD
+	md, err := FromConfluenceStorageWithOptions(xhtml, ConvertOptions{ShowMacros: true})
+	require.NoError(t, err)
+
+	// All text and macros should be present
+	assert.Contains(t, md, "Start")
+	assert.Contains(t, md, "Middle")
+	assert.Contains(t, md, "End")
+	assert.Contains(t, strings.ToUpper(md), "[TOC")
+
+	// Verify order
+	startIdx := strings.Index(md, "Start")
+	middleIdx := strings.Index(md, "Middle")
+	endIdx := strings.Index(md, "End")
+
+	assert.True(t, startIdx < middleIdx, "Start should come before Middle")
+	assert.True(t, middleIdx < endIdx, "Middle should come before End")
+}
+
+func TestRoundtrip_DeeplyNested(t *testing.T) {
+	input := `[INFO]
+Outer
+[WARNING]
+Inner
+[TOC]
+More inner
+[/WARNING]
+More outer
+[/INFO]`
+
+	// MD → XHTML
+	xhtml, err := ToConfluenceStorage([]byte(input))
+	require.NoError(t, err)
+
+	// Verify nesting in XHTML
+	assert.Contains(t, xhtml, `ac:name="info"`)
+	assert.Contains(t, xhtml, `ac:name="warning"`)
+	assert.Contains(t, xhtml, `ac:name="toc"`)
+
+	// XHTML → MD
+	md, err := FromConfluenceStorageWithOptions(xhtml, ConvertOptions{ShowMacros: true})
+	require.NoError(t, err)
+
+	// All elements should be present
+	assert.Contains(t, md, "Outer")
+	assert.Contains(t, strings.ToUpper(md), "[INFO")
+	assert.Contains(t, strings.ToUpper(md), "[WARNING")
+	assert.Contains(t, strings.ToUpper(md), "[TOC")
+	assert.Contains(t, md, "Inner")
+}
+
+// Bug 1 regression test: close tag should not duplicate content
+func TestRoundtrip_CloseTagNotDuplicated(t *testing.T) {
+	input := "[INFO]unique content[/INFO]"
+
+	// MD → XHTML
+	xhtml, err := ToConfluenceStorage([]byte(input))
+	require.NoError(t, err)
+
+	// Content should appear exactly once in XHTML
+	assert.Equal(t, 1, strings.Count(xhtml, "unique content"))
+
+	// XHTML → MD
+	md, err := FromConfluenceStorageWithOptions(xhtml, ConvertOptions{ShowMacros: true})
+	require.NoError(t, err)
+
+	// Content should appear exactly once in MD
+	assert.Equal(t, 1, strings.Count(md, "unique content"))
+}
