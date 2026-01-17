@@ -203,9 +203,15 @@ packaging/
 │   ├── tools/chocolateyInstall.ps1
 │   ├── tools/chocolateyUninstall.ps1
 │   └── README.md            # Publishing instructions
+├── winget/                  # Windows Winget manifests
+│   ├── OpenCLICollective.cfl.yaml
+│   ├── OpenCLICollective.cfl.installer.yaml
+│   ├── OpenCLICollective.cfl.locale.en-US.yaml
+│   └── README.md            # Publishing instructions
 └── homebrew/
     └── README.md            # Points to GoReleaser config
 ```
 
 - **Homebrew**: Managed by GoReleaser, published to [open-cli-collective/homebrew-tap](https://github.com/open-cli-collective/homebrew-tap)
 - **Chocolatey**: Manual publish process documented in `packaging/chocolatey/README.md`
+- **Winget**: PR submission to [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs), documented in `packaging/winget/README.md`

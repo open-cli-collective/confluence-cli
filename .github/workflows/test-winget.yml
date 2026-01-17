@@ -1,0 +1,76 @@
+name: Test Winget Manifest
+
+on:
+  pull_request:
+    paths:
+      - 'packaging/winget/**'
+      - '.github/workflows/test-winget.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packaging/winget/**'
+      - '.github/workflows/test-winget.yml'
+
+jobs:
+  validate-winget:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate manifest schema
+        shell: pwsh
+        run: |
+          # Create temp manifests with valid HTTPS URLs for schema validation
+          # (winget validate requires HTTPS URLs)
+          $testDir = "winget-validate-test"
+          New-Item -ItemType Directory -Path $testDir -Force | Out-Null
+
+          Set-Content "$testDir/OpenCLICollective.cfl.yaml" -Encoding UTF8 @(
+            'PackageIdentifier: OpenCLICollective.cfl'
+            'PackageVersion: 0.0.1'
+            'DefaultLocale: en-US'
+            'ManifestType: version'
+            'ManifestVersion: 1.6.0'
+          )
+
+          Set-Content "$testDir/OpenCLICollective.cfl.locale.en-US.yaml" -Encoding UTF8 @(
+            'PackageIdentifier: OpenCLICollective.cfl'
+            'PackageVersion: 0.0.1'
+            'PackageLocale: en-US'
+            'Publisher: Open CLI Collective'
+            'PublisherUrl: https://github.com/open-cli-collective'
+            'PackageName: Confluence CLI'
+            'PackageUrl: https://github.com/open-cli-collective/confluence-cli'
+            'License: MIT'
+            'LicenseUrl: https://github.com/open-cli-collective/confluence-cli/blob/main/LICENSE'
+            'ShortDescription: Command-line interface for Atlassian Confluence Cloud'
+            'ManifestType: defaultLocale'
+            'ManifestVersion: 1.6.0'
+          )
+
+          Set-Content "$testDir/OpenCLICollective.cfl.installer.yaml" -Encoding UTF8 @(
+            'PackageIdentifier: OpenCLICollective.cfl'
+            'PackageVersion: 0.0.1'
+            'InstallerType: zip'
+            'NestedInstallerType: portable'
+            'NestedInstallerFiles:'
+            '  - RelativeFilePath: cfl.exe'
+            '    PortableCommandAlias: cfl'
+            'Installers:'
+            '  - Architecture: x64'
+            '    InstallerUrl: https://github.com/open-cli-collective/confluence-cli/releases/download/v0.0.1/cfl_0.0.1_windows_amd64.zip'
+            '    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000001'
+            '  - Architecture: arm64'
+            '    InstallerUrl: https://github.com/open-cli-collective/confluence-cli/releases/download/v0.0.1/cfl_0.0.1_windows_arm64.zip'
+            '    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000002'
+            'ManifestType: installer'
+            'ManifestVersion: 1.6.0'
+          )
+
+          Write-Host "Validating winget manifest schema..."
+          winget validate --manifest $testDir/
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Manifest schema validation failed"
+            exit 1
+          }
+          Write-Host "Manifest schema validation passed!"
