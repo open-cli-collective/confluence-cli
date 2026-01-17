@@ -28,60 +28,63 @@ jobs:
       - name: Create test zip package
         shell: pwsh
         run: |
-          # Create zip matching our release structure
           Compress-Archive -Path cfl.exe, LICENSE, README.md -DestinationPath cfl_0.0.1_windows_amd64.zip
-
-          # Calculate SHA256
           $hash = (Get-FileHash cfl_0.0.1_windows_amd64.zip -Algorithm SHA256).Hash
           Write-Host "SHA256: $hash"
-
-          # Update version manifest
-          $versionManifest = @"
-PackageIdentifier: OpenCLICollective.cfl
-PackageVersion: 0.0.1
-DefaultLocale: en-US
-ManifestType: version
-ManifestVersion: 1.6.0
-"@
-          Set-Content packaging/winget/OpenCLICollective.cfl.yaml $versionManifest
-
-          # Update locale manifest
-          $localeManifest = @"
-PackageIdentifier: OpenCLICollective.cfl
-PackageVersion: 0.0.1
-PackageLocale: en-US
-Publisher: Open CLI Collective
-PublisherUrl: https://github.com/open-cli-collective
-PackageName: Confluence CLI
-PackageUrl: https://github.com/open-cli-collective/confluence-cli
-License: MIT
-LicenseUrl: https://github.com/open-cli-collective/confluence-cli/blob/main/LICENSE
-ShortDescription: Command-line interface for Atlassian Confluence Cloud
-ManifestType: defaultLocale
-ManifestVersion: 1.6.0
-"@
-          Set-Content packaging/winget/OpenCLICollective.cfl.locale.en-US.yaml $localeManifest
-
-          # Create installer manifest with local file URL
           $localUrl = "file:///$($pwd.Path -replace '\\','/')/cfl_0.0.1_windows_amd64.zip"
-          $installerManifest = @"
-PackageIdentifier: OpenCLICollective.cfl
-PackageVersion: 0.0.1
-InstallerType: zip
-NestedInstallerType: portable
-NestedInstallerFiles:
-  - RelativeFilePath: cfl.exe
-    PortableCommandAlias: cfl
-Installers:
-  - Architecture: x64
-    InstallerUrl: $localUrl
-    InstallerSha256: $hash
-ManifestType: installer
-ManifestVersion: 1.6.0
-"@
-          Set-Content packaging/winget/OpenCLICollective.cfl.installer.yaml $installerManifest
+          Write-Host "Local URL: $localUrl"
+          echo "HASH=$hash" >> $env:GITHUB_ENV
+          echo "LOCAL_URL=$localUrl" >> $env:GITHUB_ENV
 
-          Write-Host "Updated manifests for testing:"
+      - name: Generate test manifests
+        shell: pwsh
+        run: |
+          $hash = $env:HASH
+          $localUrl = $env:LOCAL_URL
+
+          # Version manifest
+          Set-Content packaging/winget/OpenCLICollective.cfl.yaml @(
+            'PackageIdentifier: OpenCLICollective.cfl'
+            'PackageVersion: 0.0.1'
+            'DefaultLocale: en-US'
+            'ManifestType: version'
+            'ManifestVersion: 1.6.0'
+          )
+
+          # Locale manifest
+          Set-Content packaging/winget/OpenCLICollective.cfl.locale.en-US.yaml @(
+            'PackageIdentifier: OpenCLICollective.cfl'
+            'PackageVersion: 0.0.1'
+            'PackageLocale: en-US'
+            'Publisher: Open CLI Collective'
+            'PublisherUrl: https://github.com/open-cli-collective'
+            'PackageName: Confluence CLI'
+            'PackageUrl: https://github.com/open-cli-collective/confluence-cli'
+            'License: MIT'
+            'LicenseUrl: https://github.com/open-cli-collective/confluence-cli/blob/main/LICENSE'
+            'ShortDescription: Command-line interface for Atlassian Confluence Cloud'
+            'ManifestType: defaultLocale'
+            'ManifestVersion: 1.6.0'
+          )
+
+          # Installer manifest
+          Set-Content packaging/winget/OpenCLICollective.cfl.installer.yaml @(
+            'PackageIdentifier: OpenCLICollective.cfl'
+            'PackageVersion: 0.0.1'
+            'InstallerType: zip'
+            'NestedInstallerType: portable'
+            'NestedInstallerFiles:'
+            '  - RelativeFilePath: cfl.exe'
+            '    PortableCommandAlias: cfl'
+            'Installers:'
+            '  - Architecture: x64'
+            "    InstallerUrl: $localUrl"
+            "    InstallerSha256: $hash"
+            'ManifestType: installer'
+            'ManifestVersion: 1.6.0'
+          )
+
+          Write-Host "Generated installer manifest:"
           Get-Content packaging/winget/OpenCLICollective.cfl.installer.yaml
 
       - name: Validate manifests
