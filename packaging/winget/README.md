@@ -2,6 +2,14 @@
 
 This directory contains the Winget manifest templates for distributing confluence-cli on Windows via `winget install OpenCLICollective.cfl`.
 
+## Automated Publishing
+
+Publishing to Winget is automated via GitHub Actions. When a new release tag is pushed, the release workflow uses `wingetcreate` to submit a PR to [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs).
+
+**Required secret:** `WINGET_GITHUB_TOKEN` - A GitHub PAT with `public_repo` scope, needed to create PRs on microsoft/winget-pkgs.
+
+**Note:** Unlike Chocolatey (direct publish), Winget submissions are PRs that go through Microsoft's automated validation before merging.
+
 ## Manifest Structure
 
 ```
