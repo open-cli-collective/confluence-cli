@@ -1,0 +1,101 @@
+name: Test Winget Manifest
+
+on:
+  pull_request:
+    paths:
+      - 'packaging/winget/**'
+      - '.github/workflows/test-winget.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packaging/winget/**'
+      - '.github/workflows/test-winget.yml'
+
+jobs:
+  test-winget:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Build binary for testing
+        run: go build -o cfl.exe ./cmd/cfl
+
+      - name: Create test zip package
+        shell: pwsh
+        run: |
+          # Create zip matching our release structure
+          Compress-Archive -Path cfl.exe, LICENSE, README.md -DestinationPath cfl_0.0.1_windows_amd64.zip
+
+          # Calculate SHA256
+          $hash = (Get-FileHash cfl_0.0.1_windows_amd64.zip -Algorithm SHA256).Hash
+          Write-Host "SHA256: $hash"
+
+          # Update manifests with test version and real checksum
+          $files = @(
+            'packaging/winget/OpenCLICollective.cfl.yaml',
+            'packaging/winget/OpenCLICollective.cfl.installer.yaml',
+            'packaging/winget/OpenCLICollective.cfl.locale.en-US.yaml'
+          )
+
+          foreach ($file in $files) {
+            (Get-Content $file) -replace '0\.0\.0', '0.0.1' | Set-Content $file
+          }
+
+          # Update installer manifest with local file URL and real checksum
+          $installerPath = 'packaging/winget/OpenCLICollective.cfl.installer.yaml'
+          $content = Get-Content $installerPath -Raw
+
+          # Point to local file and update checksum (only x64 for testing)
+          $localUrl = "file:///$($pwd.Path -replace '\\','/')/cfl_0.0.1_windows_amd64.zip"
+          $content = $content -replace 'https://github.com/.+windows_amd64\.zip', $localUrl
+          $content = $content -replace '0{64}', $hash
+
+          # Remove arm64 entry for local testing (we only built x64)
+          $content = $content -replace '(?ms)  - Architecture: arm64.*?InstallerSha256: [A-F0-9]{64}', ''
+
+          Set-Content $installerPath $content
+          Write-Host "Updated installer manifest:"
+          Get-Content $installerPath
+
+      - name: Validate manifests
+        shell: pwsh
+        run: |
+          Write-Host "Validating Winget manifests..."
+          winget validate --manifest packaging/winget/
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Manifest validation failed"
+            exit 1
+          }
+          Write-Host "Manifest validation passed!"
+
+      - name: Install from local manifest
+        shell: pwsh
+        run: |
+          Write-Host "Installing from local manifest..."
+          winget install --manifest packaging/winget/ --accept-package-agreements --accept-source-agreements
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Installation failed"
+            exit 1
+          }
+
+      - name: Verify installation
+        shell: pwsh
+        run: |
+          Write-Host "Testing cfl --version..."
+          cfl --version
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "cfl --version failed"
+            exit 1
+          }
+          Write-Host "cfl is working!"
+
+      - name: Test uninstall
+        shell: pwsh
+        run: |
+          winget uninstall OpenCLICollective.cfl --accept-source-agreements
+          Write-Host "Uninstall completed"
