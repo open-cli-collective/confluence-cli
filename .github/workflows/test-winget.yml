@@ -36,20 +36,17 @@ jobs:
           Write-Host "SHA256: $hash"
 
           # Update version manifest
-          @"
-# yaml-language-server: `$schema=https://aka.ms/winget-manifest.version.1.6.0.schema.json
-
+          $versionManifest = @"
 PackageIdentifier: OpenCLICollective.cfl
 PackageVersion: 0.0.1
 DefaultLocale: en-US
 ManifestType: version
 ManifestVersion: 1.6.0
-"@ | Set-Content packaging/winget/OpenCLICollective.cfl.yaml
+"@
+          Set-Content packaging/winget/OpenCLICollective.cfl.yaml $versionManifest
 
           # Update locale manifest
-          @"
-# yaml-language-server: `$schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
-
+          $localeManifest = @"
 PackageIdentifier: OpenCLICollective.cfl
 PackageVersion: 0.0.1
 PackageLocale: en-US
@@ -62,13 +59,12 @@ LicenseUrl: https://github.com/open-cli-collective/confluence-cli/blob/main/LICE
 ShortDescription: Command-line interface for Atlassian Confluence Cloud
 ManifestType: defaultLocale
 ManifestVersion: 1.6.0
-"@ | Set-Content packaging/winget/OpenCLICollective.cfl.locale.en-US.yaml
+"@
+          Set-Content packaging/winget/OpenCLICollective.cfl.locale.en-US.yaml $localeManifest
 
           # Create installer manifest with local file URL
           $localUrl = "file:///$($pwd.Path -replace '\\','/')/cfl_0.0.1_windows_amd64.zip"
-          @"
-# yaml-language-server: `$schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
-
+          $installerManifest = @"
 PackageIdentifier: OpenCLICollective.cfl
 PackageVersion: 0.0.1
 InstallerType: zip
@@ -82,7 +78,8 @@ Installers:
     InstallerSha256: $hash
 ManifestType: installer
 ManifestVersion: 1.6.0
-"@ | Set-Content packaging/winget/OpenCLICollective.cfl.installer.yaml
+"@
+          Set-Content packaging/winget/OpenCLICollective.cfl.installer.yaml $installerManifest
 
           Write-Host "Updated manifests for testing:"
           Get-Content packaging/winget/OpenCLICollective.cfl.installer.yaml
