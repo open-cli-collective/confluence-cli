@@ -20,9 +20,6 @@ builds:
     goarch:
       - amd64
       - arm64
-    ignore:
-      - goos: windows
-        goarch: arm64
     ldflags:
       - -s -w
       - -X github.com/open-cli-collective/confluence-cli/internal/version.Version={{.Version}}
