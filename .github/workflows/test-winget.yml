@@ -43,7 +43,7 @@ jobs:
           $localUrl = $env:LOCAL_URL
 
           # Version manifest
-          Set-Content packaging/winget/OpenCLICollective.cfl.yaml @(
+          Set-Content packaging/winget/OpenCLICollective.cfl.yaml -Encoding UTF8 @(
             'PackageIdentifier: OpenCLICollective.cfl'
             'PackageVersion: 0.0.1'
             'DefaultLocale: en-US'
@@ -52,7 +52,7 @@ jobs:
           )
 
           # Locale manifest
-          Set-Content packaging/winget/OpenCLICollective.cfl.locale.en-US.yaml @(
+          Set-Content packaging/winget/OpenCLICollective.cfl.locale.en-US.yaml -Encoding UTF8 @(
             'PackageIdentifier: OpenCLICollective.cfl'
             'PackageVersion: 0.0.1'
             'PackageLocale: en-US'
@@ -68,7 +68,7 @@ jobs:
           )
 
           # Installer manifest
-          Set-Content packaging/winget/OpenCLICollective.cfl.installer.yaml @(
+          Set-Content packaging/winget/OpenCLICollective.cfl.installer.yaml -Encoding UTF8 @(
             'PackageIdentifier: OpenCLICollective.cfl'
             'PackageVersion: 0.0.1'
             'InstallerType: zip'
