@@ -59,10 +59,10 @@ jobs:
             'Installers:'
             '  - Architecture: x64'
             '    InstallerUrl: https://github.com/open-cli-collective/confluence-cli/releases/download/v0.0.1/cfl_0.0.1_windows_amd64.zip'
-            '    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000'
+            '    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000001'
             '  - Architecture: arm64'
             '    InstallerUrl: https://github.com/open-cli-collective/confluence-cli/releases/download/v0.0.1/cfl_0.0.1_windows_arm64.zip'
-            '    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000'
+            '    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000002'
             'ManifestType: installer'
             'ManifestVersion: 1.6.0'
           )
