@@ -31,19 +31,17 @@ jobs:
           Compress-Archive -Path cfl.exe, LICENSE, README.md -DestinationPath cfl_0.0.1_windows_amd64.zip
           $hash = (Get-FileHash cfl_0.0.1_windows_amd64.zip -Algorithm SHA256).Hash
           Write-Host "SHA256: $hash"
-          $localUrl = "file:///$($pwd.Path -replace '\\','/')/cfl_0.0.1_windows_amd64.zip"
-          Write-Host "Local URL: $localUrl"
           echo "HASH=$hash" >> $env:GITHUB_ENV
-          echo "LOCAL_URL=$localUrl" >> $env:GITHUB_ENV
 
-      - name: Generate test manifests
+      - name: Validate manifest templates (schema check)
         shell: pwsh
         run: |
-          $hash = $env:HASH
-          $localUrl = $env:LOCAL_URL
+          # Create validation manifests with placeholder HTTPS URLs
+          # (winget validate requires HTTPS URLs for schema compliance)
+          $testDir = "winget-validate-test"
+          New-Item -ItemType Directory -Path $testDir -Force | Out-Null
 
-          # Version manifest
-          Set-Content packaging/winget/OpenCLICollective.cfl.yaml -Encoding UTF8 @(
+          Set-Content "$testDir/OpenCLICollective.cfl.yaml" -Encoding UTF8 @(
             'PackageIdentifier: OpenCLICollective.cfl'
             'PackageVersion: 0.0.1'
             'DefaultLocale: en-US'
@@ -51,8 +49,7 @@ jobs:
             'ManifestVersion: 1.6.0'
           )
 
-          # Locale manifest
-          Set-Content packaging/winget/OpenCLICollective.cfl.locale.en-US.yaml -Encoding UTF8 @(
+          Set-Content "$testDir/OpenCLICollective.cfl.locale.en-US.yaml" -Encoding UTF8 @(
             'PackageIdentifier: OpenCLICollective.cfl'
             'PackageVersion: 0.0.1'
             'PackageLocale: en-US'
@@ -67,8 +64,65 @@ jobs:
             'ManifestVersion: 1.6.0'
           )
 
-          # Installer manifest
-          Set-Content packaging/winget/OpenCLICollective.cfl.installer.yaml -Encoding UTF8 @(
+          # Use placeholder HTTPS URL and hash for schema validation
+          Set-Content "$testDir/OpenCLICollective.cfl.installer.yaml" -Encoding UTF8 @(
+            'PackageIdentifier: OpenCLICollective.cfl'
+            'PackageVersion: 0.0.1'
+            'InstallerType: zip'
+            'NestedInstallerType: portable'
+            'NestedInstallerFiles:'
+            '  - RelativeFilePath: cfl.exe'
+            '    PortableCommandAlias: cfl'
+            'Installers:'
+            '  - Architecture: x64'
+            '    InstallerUrl: https://github.com/open-cli-collective/confluence-cli/releases/download/v0.0.1/cfl_0.0.1_windows_amd64.zip'
+            '    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000'
+            'ManifestType: installer'
+            'ManifestVersion: 1.6.0'
+          )
+
+          Write-Host "Validating manifest schema..."
+          winget validate --manifest $testDir/
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Manifest schema validation failed"
+            exit 1
+          }
+          Write-Host "Schema validation passed!"
+
+      - name: Generate local test manifests
+        shell: pwsh
+        run: |
+          $hash = $env:HASH
+          $localUrl = "file:///$($pwd.Path -replace '\\','/')/cfl_0.0.1_windows_amd64.zip"
+
+          # Create test directory for local installation
+          $testDir = "winget-install-test"
+          New-Item -ItemType Directory -Path $testDir -Force | Out-Null
+
+          Set-Content "$testDir/OpenCLICollective.cfl.yaml" -Encoding UTF8 @(
+            'PackageIdentifier: OpenCLICollective.cfl'
+            'PackageVersion: 0.0.1'
+            'DefaultLocale: en-US'
+            'ManifestType: version'
+            'ManifestVersion: 1.6.0'
+          )
+
+          Set-Content "$testDir/OpenCLICollective.cfl.locale.en-US.yaml" -Encoding UTF8 @(
+            'PackageIdentifier: OpenCLICollective.cfl'
+            'PackageVersion: 0.0.1'
+            'PackageLocale: en-US'
+            'Publisher: Open CLI Collective'
+            'PublisherUrl: https://github.com/open-cli-collective'
+            'PackageName: Confluence CLI'
+            'PackageUrl: https://github.com/open-cli-collective/confluence-cli'
+            'License: MIT'
+            'LicenseUrl: https://github.com/open-cli-collective/confluence-cli/blob/main/LICENSE'
+            'ShortDescription: Command-line interface for Atlassian Confluence Cloud'
+            'ManifestType: defaultLocale'
+            'ManifestVersion: 1.6.0'
+          )
+
+          Set-Content "$testDir/OpenCLICollective.cfl.installer.yaml" -Encoding UTF8 @(
             'PackageIdentifier: OpenCLICollective.cfl'
             'PackageVersion: 0.0.1'
             'InstallerType: zip'
@@ -84,28 +138,14 @@ jobs:
             'ManifestVersion: 1.6.0'
           )
 
-          Write-Host "Generated installer manifest:"
-          Get-Content packaging/winget/OpenCLICollective.cfl.installer.yaml
-
-      - name: Validate manifests
-        shell: pwsh
-        run: |
-          # Remove README.md - winget validate tries to parse all files as YAML
-          Remove-Item packaging/winget/README.md -ErrorAction SilentlyContinue
-
-          Write-Host "Validating Winget manifests..."
-          winget validate --manifest packaging/winget/
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Manifest validation failed"
-            exit 1
-          }
-          Write-Host "Manifest validation passed!"
+          Write-Host "Generated installer manifest for local testing:"
+          Get-Content "$testDir/OpenCLICollective.cfl.installer.yaml"
 
       - name: Install from local manifest
         shell: pwsh
         run: |
           Write-Host "Installing from local manifest..."
-          winget install --manifest packaging/winget/ --accept-package-agreements --accept-source-agreements
+          winget install --manifest winget-install-test/ --accept-package-agreements --accept-source-agreements
           if ($LASTEXITCODE -ne 0) {
             Write-Error "Installation failed"
             exit 1
