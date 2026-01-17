@@ -181,9 +181,11 @@ Use these prefixes for commit messages:
 - `refactor:` - Code changes that don't fix bugs or add features
 - `BREAKING CHANGE:` or `feat!:` - Breaking changes (major version bump)
 
-## Release Workflow
+## CI & Release Workflow
 
-Releases are automated with a dual-gate system to avoid unnecessary releases:
+**CI** skips Go build/test/lint jobs when only non-Go files change (docs, packaging, workflows). Jobs show as "Skipped" rather than not running, so branch protection still works.
+
+**Releases** are automated with a dual-gate system to avoid unnecessary releases:
 
 **Gate 1 - Path filter:** Only triggers when Go code changes (`**.go`, `go.mod`, `go.sum`)
 **Gate 2 - Commit prefix:** Only `feat:` and `fix:` commits create releases
