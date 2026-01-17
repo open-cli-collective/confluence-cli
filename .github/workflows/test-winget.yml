@@ -35,32 +35,57 @@ jobs:
           $hash = (Get-FileHash cfl_0.0.1_windows_amd64.zip -Algorithm SHA256).Hash
           Write-Host "SHA256: $hash"
 
-          # Update manifests with test version and real checksum
-          $files = @(
-            'packaging/winget/OpenCLICollective.cfl.yaml',
-            'packaging/winget/OpenCLICollective.cfl.installer.yaml',
-            'packaging/winget/OpenCLICollective.cfl.locale.en-US.yaml'
-          )
+          # Update version manifest
+          @"
+# yaml-language-server: `$schema=https://aka.ms/winget-manifest.version.1.6.0.schema.json
 
-          foreach ($file in $files) {
-            (Get-Content $file) -replace '0\.0\.0', '0.0.1' | Set-Content $file
-          }
+PackageIdentifier: OpenCLICollective.cfl
+PackageVersion: 0.0.1
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.6.0
+"@ | Set-Content packaging/winget/OpenCLICollective.cfl.yaml
 
-          # Update installer manifest with local file URL and real checksum
-          $installerPath = 'packaging/winget/OpenCLICollective.cfl.installer.yaml'
-          $content = Get-Content $installerPath -Raw
+          # Update locale manifest
+          @"
+# yaml-language-server: `$schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
 
-          # Point to local file and update checksum (only x64 for testing)
+PackageIdentifier: OpenCLICollective.cfl
+PackageVersion: 0.0.1
+PackageLocale: en-US
+Publisher: Open CLI Collective
+PublisherUrl: https://github.com/open-cli-collective
+PackageName: Confluence CLI
+PackageUrl: https://github.com/open-cli-collective/confluence-cli
+License: MIT
+LicenseUrl: https://github.com/open-cli-collective/confluence-cli/blob/main/LICENSE
+ShortDescription: Command-line interface for Atlassian Confluence Cloud
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0
+"@ | Set-Content packaging/winget/OpenCLICollective.cfl.locale.en-US.yaml
+
+          # Create installer manifest with local file URL
           $localUrl = "file:///$($pwd.Path -replace '\\','/')/cfl_0.0.1_windows_amd64.zip"
-          $content = $content -replace 'https://github.com/.+windows_amd64\.zip', $localUrl
-          $content = $content -replace '0{64}', $hash
+          @"
+# yaml-language-server: `$schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
 
-          # Remove arm64 entry for local testing (we only built x64)
-          $content = $content -replace '(?ms)  - Architecture: arm64.*?InstallerSha256: [A-F0-9]{64}', ''
+PackageIdentifier: OpenCLICollective.cfl
+PackageVersion: 0.0.1
+InstallerType: zip
+NestedInstallerType: portable
+NestedInstallerFiles:
+  - RelativeFilePath: cfl.exe
+    PortableCommandAlias: cfl
+Installers:
+  - Architecture: x64
+    InstallerUrl: $localUrl
+    InstallerSha256: $hash
+ManifestType: installer
+ManifestVersion: 1.6.0
+"@ | Set-Content packaging/winget/OpenCLICollective.cfl.installer.yaml
 
-          Set-Content $installerPath $content
-          Write-Host "Updated installer manifest:"
-          Get-Content $installerPath
+          Write-Host "Updated manifests for testing:"
+          Get-Content packaging/winget/OpenCLICollective.cfl.installer.yaml
 
       - name: Validate manifests
         shell: pwsh
