@@ -90,6 +90,9 @@ jobs:
       - name: Validate manifests
         shell: pwsh
         run: |
+          # Remove README.md - winget validate tries to parse all files as YAML
+          Remove-Item packaging/winget/README.md -ErrorAction SilentlyContinue
+
           Write-Host "Validating Winget manifests..."
           winget validate --manifest packaging/winget/
           if ($LASTEXITCODE -ne 0) {
