@@ -23,12 +23,6 @@ brew tap open-cli-collective/tap
 brew install --cask cfl
 ```
 
-### Chocolatey (Windows)
-
-```powershell
-choco install confluence-cli
-```
-
 ### Go Install
 
 ```bash
