@@ -222,4 +222,4 @@ packaging/
 
 - **Homebrew**: Automated via GoReleaser, published to [open-cli-collective/homebrew-tap](https://github.com/open-cli-collective/homebrew-tap)
 - **Chocolatey**: Automated via release workflow, requires `CHOCOLATEY_API_KEY` secret
-- **Winget**: Manual PR submission to [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs), documented in `packaging/winget/README.md`
+- **Winget**: Automated via release workflow, requires `WINGET_GITHUB_TOKEN` secret (PAT with `public_repo` scope)

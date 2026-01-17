@@ -55,3 +55,25 @@ jobs:
         run: |
           cd packaging/chocolatey
           choco push (Get-ChildItem *.nupkg).Name --source https://push.chocolatey.org/ --key ${{ secrets.CHOCOLATEY_API_KEY }}
+
+  winget:
+    needs: goreleaser
+    runs-on: windows-latest
+    steps:
+      - name: Install wingetcreate
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+
+      - name: Submit to Winget
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          $x64 = "https://github.com/open-cli-collective/confluence-cli/releases/download/${{ github.ref_name }}/cfl_${version}_windows_amd64.zip"
+          $arm64 = "https://github.com/open-cli-collective/confluence-cli/releases/download/${{ github.ref_name }}/cfl_${version}_windows_arm64.zip"
+
+          Write-Host "Submitting version $version to Winget"
+          Write-Host "x64 URL: $x64"
+          Write-Host "arm64 URL: $arm64"
+
+          ./wingetcreate.exe update OpenCLICollective.cfl --version $version --urls $x64 $arm64 --submit --token ${{ secrets.WINGET_GITHUB_TOKEN }}
