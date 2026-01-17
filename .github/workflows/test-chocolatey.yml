@@ -29,9 +29,9 @@ jobs:
         shell: pwsh
         working-directory: packaging/chocolatey
         run: |
-          # Replace placeholder version with test version
+          # Replace placeholder version with test version (must not be prerelease)
           (Get-Content confluence-cli.nuspec) `
-            -replace '<version>0.0.0</version>', '<version>0.0.1-test</version>' |
+            -replace '<version>0.0.0</version>', '<version>0.0.1</version>' |
             Set-Content confluence-cli.nuspec
 
           # Create a simple install script that uses the local binary
