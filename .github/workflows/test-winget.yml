@@ -141,11 +141,17 @@ jobs:
           Write-Host "Generated installer manifest for local testing:"
           Get-Content "$testDir/OpenCLICollective.cfl.installer.yaml"
 
+      - name: Enable local manifest files
+        shell: pwsh
+        run: |
+          # Enable local manifest files feature (requires admin on Windows)
+          winget settings --enable LocalManifestFiles
+
       - name: Install from local manifest
         shell: pwsh
         run: |
           Write-Host "Installing from local manifest..."
-          winget install --manifest winget-install-test/ --accept-package-agreements --accept-source-agreements
+          winget install --manifest winget-install-test/ --accept-package-agreements --accept-source-agreements --ignore-local-archive-malware-scan
           if ($LASTEXITCODE -ne 0) {
             Write-Error "Installation failed"
             exit 1
