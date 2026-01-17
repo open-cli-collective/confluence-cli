@@ -1,5 +1,16 @@
 # Release Notes
 
+## v0.10.0 (2026-01-17)
+
+Adds Windows ARM64 binary distribution.
+
+### Features
+- Add Windows ARM64 build target to releases ([#70](https://github.com/open-cli-collective/confluence-cli/issues/70))
+  - Download `cfl_X.Y.Z_windows_arm64.zip` from GitHub Releases
+  - Enables future Windows package manager support (Chocolatey, Winget) for ARM64 devices
+
+---
+
 ## v0.9.0 (2026-01-16)
 
 Enables clean roundtrip editing for pages with macros.
