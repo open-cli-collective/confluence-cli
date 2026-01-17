@@ -11,6 +11,8 @@
     <projectSourceUrl>https://github.com/open-cli-collective/confluence-cli</projectSourceUrl>
     <packageSourceUrl>https://github.com/open-cli-collective/confluence-cli/tree/main/packaging/chocolatey</packageSourceUrl>
     <bugTrackerUrl>https://github.com/open-cli-collective/confluence-cli/issues</bugTrackerUrl>
+    <iconUrl>https://cdn.jsdelivr.net/gh/open-cli-collective/confluence-cli@main/assets/logo/cfl-256.png</iconUrl>
+    <copyright>Copyright (c) 2025 Open CLI Collective</copyright>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>A command-line interface for Atlassian Confluence Cloud. Provides markdown-first page management with automatic conversion between Markdown and Confluence's storage format.
 
