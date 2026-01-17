@@ -141,11 +141,12 @@ jobs:
           Write-Host "Generated installer manifest for local testing:"
           Get-Content "$testDir/OpenCLICollective.cfl.installer.yaml"
 
-      - name: Enable local manifest files
+      - name: Enable winget local testing features
         shell: pwsh
         run: |
-          # Enable local manifest files feature (requires admin on Windows)
+          # Enable required settings for local manifest testing
           winget settings --enable LocalManifestFiles
+          winget settings --enable LocalArchiveMalwareScanOverride
 
       - name: Install from local manifest
         shell: pwsh
