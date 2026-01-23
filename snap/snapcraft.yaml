@@ -1,4 +1,4 @@
-name: cfl
+name: ocli-confluence
 base: core22
 version: git
 summary: Command-line interface for Atlassian Confluence Cloud
@@ -29,12 +29,14 @@ plugs:
       - $HOME/.config/cfl
 
 apps:
-  cfl:
+  ocli-confluence:
     command: bin/cfl
     plugs:
       - home
       - network
       - dot-config-cfl
+    aliases:
+      - cfl
 
 parts:
   cfl:
