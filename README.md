@@ -16,36 +16,118 @@ A command-line interface for Atlassian Confluence Cloud, inspired by [jira-cli](
 
 ## Installation
 
-### Homebrew (macOS/Linux)
+### macOS
+
+**Homebrew (recommended)**
 
 ```bash
-brew tap open-cli-collective/tap
-brew install cfl
+brew install open-cli-collective/tap/cfl
 ```
 
-### Chocolatey (Windows)
+> Note: This installs from our third-party tap. The formula is not yet in Homebrew core.
+
+**Binary download**
+
+Download from the [Releases page](https://github.com/open-cli-collective/confluence-cli/releases) - available for Intel and Apple Silicon.
+
+---
+
+### Windows
+
+**Chocolatey**
 
 ```powershell
 choco install confluence-cli
 ```
 
-### Winget (Windows)
+**Winget**
 
 ```powershell
 winget install OpenCLICollective.cfl
 ```
 
-### Go Install
+**Binary download**
+
+Download from the [Releases page](https://github.com/open-cli-collective/confluence-cli/releases) - available for x64 and ARM64.
+
+---
+
+### Linux
+
+**Snap (recommended)**
+
+```bash
+sudo snap install ocli-confluence
+```
+
+The command is `cfl` after installation.
+
+**APT (Debian/Ubuntu)**
+
+```bash
+# Add the GPG key
+curl -fsSL https://open-cli-collective.github.io/linux-packages/keys/gpg.asc | sudo gpg --dearmor -o /usr/share/keyrings/open-cli-collective.gpg
+
+# Add the repository
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/open-cli-collective.gpg] https://open-cli-collective.github.io/linux-packages/apt stable main" | sudo tee /etc/apt/sources.list.d/open-cli-collective.list
+
+# Install
+sudo apt update
+sudo apt install cfl
+```
+
+> Note: This is our third-party APT repository, not the official Debian/Ubuntu repos.
+
+**DNF/YUM (Fedora/RHEL/CentOS)**
+
+```bash
+# Add the repository
+sudo tee /etc/yum.repos.d/open-cli-collective.repo << 'EOF'
+[open-cli-collective]
+name=Open CLI Collective
+baseurl=https://open-cli-collective.github.io/linux-packages/rpm
+enabled=1
+gpgcheck=1
+gpgkey=https://open-cli-collective.github.io/linux-packages/keys/gpg.asc
+EOF
+
+# Install
+sudo dnf install cfl
+```
+
+> Note: This is our third-party RPM repository, not the official Fedora/RHEL repos.
+
+**Homebrew**
+
+```bash
+brew install open-cli-collective/tap/cfl
+```
+
+**Binary download**
+
+Download `.deb`, `.rpm`, or `.tar.gz` from the [Releases page](https://github.com/open-cli-collective/confluence-cli/releases) - available for x64 and ARM64.
+
+```bash
+# Direct .deb install
+curl -LO https://github.com/open-cli-collective/confluence-cli/releases/latest/download/cfl_VERSION_linux_amd64.deb
+sudo dpkg -i cfl_VERSION_linux_amd64.deb
+
+# Direct .rpm install
+curl -LO https://github.com/open-cli-collective/confluence-cli/releases/latest/download/cfl-VERSION.x86_64.rpm
+sudo rpm -i cfl-VERSION.x86_64.rpm
+```
+
+---
+
+### From Source
+
+**Go install**
 
 ```bash
 go install github.com/open-cli-collective/confluence-cli/cmd/cfl@latest
 ```
 
-### Binary Download
-
-Download the latest release from the [Releases page](https://github.com/open-cli-collective/confluence-cli/releases).
-
-Available for Windows (x64, ARM64), macOS (Intel, Apple Silicon), and Linux (x64, ARM64).
+Requires Go 1.22 or later.
 
 ## Quick Start
 
