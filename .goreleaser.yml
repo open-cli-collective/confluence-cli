@@ -39,6 +39,23 @@ archives:
       - LICENSE
       - README.md
 
+# Linux packages (.deb and .rpm)
+nfpms:
+  - id: cfl
+    package_name: cfl
+    vendor: Open CLI Collective
+    homepage: https://github.com/open-cli-collective/confluence-cli
+    maintainer: Open CLI Collective <https://github.com/open-cli-collective>
+    description: Command-line interface for Atlassian Confluence Cloud
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    contents:
+      - src: LICENSE
+        dst: /usr/share/licenses/cfl/LICENSE
+
 # Homebrew cask with auto-quarantine removal for unsigned binaries
 homebrew_casks:
   - name: cfl
