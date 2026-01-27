@@ -45,6 +45,16 @@ type SearchContainer struct {
 	DisplayURL string `json:"displayUrl"`
 }
 
+// SpaceKey extracts the space key from the DisplayURL.
+// DisplayURL is typically in the format "/display/SPACEKEY" or "/spaces/SPACEKEY/...".
+func (c SearchContainer) SpaceKey() string {
+	parts := strings.Split(strings.TrimPrefix(c.DisplayURL, "/"), "/")
+	if len(parts) >= 2 && (parts[0] == "display" || parts[0] == "spaces") {
+		return parts[1]
+	}
+	return ""
+}
+
 // SearchResponse represents the v1 search API response.
 type SearchResponse struct {
 	Results        []SearchResult `json:"results"`

@@ -14,13 +14,20 @@ import (
 
 func TestRunView_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Contains(t, r.URL.Path, "/pages/12345")
 		assert.Equal(t, "GET", r.Method)
 
+		if strings.Contains(r.URL.Path, "/spaces/") {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"id": "9999", "key": "DEV", "name": "Development"}`))
+			return
+		}
+
+		assert.Contains(t, r.URL.Path, "/pages/12345")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{
 			"id": "12345",
 			"title": "Test Page",
+			"spaceId": "9999",
 			"version": {"number": 3},
 			"body": {"storage": {"value": "<p>Hello <strong>World</strong></p>"}},
 			"_links": {"webui": "/pages/12345"}
@@ -62,10 +69,17 @@ func TestRunView_RawFormat(t *testing.T) {
 
 func TestRunView_JSONOutput(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/spaces/") {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"id": "9999", "key": "DEV", "name": "Development"}`))
+			return
+		}
+
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{
 			"id": "12345",
 			"title": "Test Page",
+			"spaceId": "9999",
 			"version": {"number": 1},
 			"body": {"storage": {"value": "<p>Content</p>"}},
 			"_links": {"webui": "/pages/12345"}
@@ -279,5 +293,3 @@ func TestRunView_ContentOnly_EmptyBody(t *testing.T) {
 	// Output should be "(No content)" without metadata headers
 }
 
-// Ensure strings is used
-var _ = strings.NewReader("")
