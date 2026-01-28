@@ -292,4 +292,3 @@ func TestRunView_ContentOnly_EmptyBody(t *testing.T) {
 	require.NoError(t, err)
 	// Output should be "(No content)" without metadata headers
 }
-
