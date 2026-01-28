@@ -48,9 +48,9 @@ func runShow(noColor bool) error {
 	dim := color.New(color.Faint)
 
 	printField := func(label, value, fileValue string, envVars ...string) {
-		bold.Printf("%-12s", label+":")
+		_, _ = bold.Printf("%-12s", label+":")
 		if value == "" {
-			dim.Println("-")
+			_, _ = dim.Println("-")
 			return
 		}
 
@@ -77,7 +77,7 @@ func runShow(noColor bool) error {
 			source = "-"
 		}
 
-		dim.Printf("  (source: %s)\n", source)
+		_, _ = dim.Printf("  (source: %s)\n", source)
 	}
 
 	printField("URL", cfg.URL, fileCfg.URL, "CFL_URL", "ATLASSIAN_URL")
@@ -86,9 +86,9 @@ func runShow(noColor bool) error {
 	printField("Space", cfg.DefaultSpace, fileCfg.DefaultSpace, "CFL_DEFAULT_SPACE")
 
 	fmt.Println()
-	dim.Printf("Config file: %s\n", configPath)
+	_, _ = dim.Printf("Config file: %s\n", configPath)
 	if fileErr != nil {
-		dim.Println("(file not found)")
+		_, _ = dim.Println("(file not found)")
 	}
 
 	return nil

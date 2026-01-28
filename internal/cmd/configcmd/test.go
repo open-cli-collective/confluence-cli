@@ -67,7 +67,7 @@ func runTest(noColor bool, httpClient *http.Client, cfgs ...*config.Config) erro
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		red.Println("✗ Connection failed:", err)
+		_, _ = red.Println("✗ Connection failed:", err)
 		fmt.Println("\nCheck your URL with: cfl config show")
 		fmt.Println("Reconfigure with: cfl init")
 		return fmt.Errorf("connection failed: %w", err)
@@ -75,23 +75,23 @@ func runTest(noColor bool, httpClient *http.Client, cfgs ...*config.Config) erro
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == 401 {
-		red.Println("✗ Authentication failed: 401 Unauthorized")
+		_, _ = red.Println("✗ Authentication failed: 401 Unauthorized")
 		fmt.Println("\nCheck your credentials with: cfl config show")
 		fmt.Println("Reconfigure with: cfl init")
 		return fmt.Errorf("authentication failed")
 	}
 	if resp.StatusCode == 403 {
-		red.Println("✗ Access denied: 403 Forbidden")
+		_, _ = red.Println("✗ Access denied: 403 Forbidden")
 		fmt.Println("\nCheck your permissions.")
 		return fmt.Errorf("access denied")
 	}
 	if resp.StatusCode != 200 {
-		red.Printf("✗ Unexpected response: %d\n", resp.StatusCode)
+		_, _ = red.Printf("✗ Unexpected response: %d\n", resp.StatusCode)
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	green.Println("✓ Authentication successful")
-	green.Println("✓ API access verified")
+	_, _ = green.Println("✓ Authentication successful")
+	_, _ = green.Println("✓ API access verified")
 	fmt.Printf("\nAuthenticated as: %s\n", cfg.Email)
 
 	return nil

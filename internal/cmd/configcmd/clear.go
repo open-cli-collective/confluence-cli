@@ -43,9 +43,9 @@ func runClear(noColor bool) error {
 	dim := color.New(color.Faint)
 
 	if os.IsNotExist(err) {
-		green.Printf("✓ No config file to remove\n")
+		_, _ = green.Printf("✓ No config file to remove\n")
 	} else {
-		green.Printf("✓ Configuration cleared from %s\n", configPath)
+		_, _ = green.Printf("✓ Configuration cleared from %s\n", configPath)
 	}
 
 	// Check if env vars are set
@@ -59,7 +59,7 @@ func runClear(noColor bool) error {
 	}
 
 	if len(activeVars) > 0 {
-		dim.Printf("\nNote: Environment variables will still be used: %s\n", fmt.Sprintf("%v", activeVars))
+		_, _ = dim.Printf("\nNote: Environment variables will still be used: %s\n", fmt.Sprintf("%v", activeVars))
 	}
 
 	return nil
