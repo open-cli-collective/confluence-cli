@@ -171,14 +171,16 @@ func runSearch(opts *searchOptions, client *api.Client) error {
 	}
 
 	// Render results
-	headers := []string{"ID", "TYPE", "SPACE", "TITLE"}
+	headers := []string{"ID", "TYPE", "SPACE KEY", "SPACE", "TITLE"}
 	var rows [][]string
 
 	for _, r := range result.Results {
 		space := r.ResultGlobalContainer.Title
+		spaceKey := r.ResultGlobalContainer.SpaceKey()
 		rows = append(rows, []string{
 			r.Content.ID,
 			r.Content.Type,
+			spaceKey,
 			view.Truncate(space, 15),
 			view.Truncate(r.Content.Title, 50),
 		})

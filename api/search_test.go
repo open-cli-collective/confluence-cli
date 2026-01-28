@@ -261,6 +261,27 @@ func TestBuildCQL_Empty(t *testing.T) {
 	assert.Empty(t, cql)
 }
 
+func TestSearchContainer_SpaceKey(t *testing.T) {
+	tests := []struct {
+		name       string
+		displayURL string
+		expected   string
+	}{
+		{"display format", "/display/DEV", "DEV"},
+		{"spaces format", "/spaces/TEAM/overview", "TEAM"},
+		{"empty", "", ""},
+		{"no matching prefix", "/other/path", ""},
+		{"only prefix", "/display/", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := SearchContainer{DisplayURL: tt.displayURL}
+			assert.Equal(t, tt.expected, c.SpaceKey())
+		})
+	}
+}
+
 func TestBuildCQL_QuotesInValue(t *testing.T) {
 	opts := &SearchOptions{Text: `search "quoted" term`}
 	cql := buildCQL(opts)
