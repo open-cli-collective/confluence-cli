@@ -112,6 +112,18 @@ func runView(pageID string, opts *viewOptions, client *api.Client) error {
 	renderer := view.NewRenderer(view.Format(opts.output), opts.noColor)
 
 	if opts.output == "json" {
+		// Enrich JSON output with spaceKey if we can resolve it
+		if page.SpaceID != "" {
+			space, err := client.GetSpace(context.Background(), page.SpaceID)
+			if err == nil {
+				// Create enriched response with spaceKey
+				type enrichedPage struct {
+					*api.Page
+					SpaceKey string `json:"spaceKey"`
+				}
+				return renderer.RenderJSON(enrichedPage{Page: page, SpaceKey: space.Key})
+			}
+		}
 		return renderer.RenderJSON(page)
 	}
 
@@ -119,6 +131,14 @@ func runView(pageID string, opts *viewOptions, client *api.Client) error {
 	if !opts.contentOnly {
 		renderer.RenderKeyValue("Title", page.Title)
 		renderer.RenderKeyValue("ID", page.ID)
+		if page.SpaceID != "" {
+			space, err := client.GetSpace(context.Background(), page.SpaceID)
+			if err == nil {
+				renderer.RenderKeyValue("Space", fmt.Sprintf("%s (ID: %s)", space.Key, page.SpaceID))
+			} else {
+				renderer.RenderKeyValue("Space ID", page.SpaceID)
+			}
+		}
 		if page.Version != nil {
 			renderer.RenderKeyValue("Version", fmt.Sprintf("%d", page.Version.Number))
 		}
