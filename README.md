@@ -676,6 +676,34 @@ export ATLASSIAN_API_TOKEN=your-api-token
 export CFL_URL=https://confluence.internal.corp.com  # Different URL for Confluence
 ```
 
+### Secure Token Storage
+
+Your API token is sensitive. Rather than storing it in a config file, we recommend using environment variables with a secret manager:
+
+**1Password CLI:**
+
+```bash
+# In your .zshrc or .bashrc
+export ATLASSIAN_API_TOKEN="$(op read 'op://Vault/Atlassian API Token/password')"
+```
+
+**macOS Keychain:**
+
+```bash
+# Store token
+security add-generic-password -s "atlassian-api" -a "api_token" -w "your-token-here"
+
+# Retrieve in shell config
+export ATLASSIAN_API_TOKEN="$(security find-generic-password -s 'atlassian-api' -a 'api_token' -w)"
+```
+
+**Windows Credential Manager:**
+
+```powershell
+# Store
+cmdkey /generic:atlassian-api /user:api_token /pass:your-token-here
+```
+
 ---
 
 ## Output Formats
