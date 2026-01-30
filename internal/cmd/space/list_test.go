@@ -216,6 +216,48 @@ func TestRunList_HasMore(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestRunList_WithCursor(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "abc123", r.URL.Query().Get("cursor"))
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{
+			"results": [
+				{"id": "789012", "key": "DOCS", "name": "Documentation", "type": "global"}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	client := api.NewClient(server.URL, "test@example.com", "token")
+	opts := &listOptions{
+		limit:   25,
+		cursor:  "abc123",
+		noColor: true,
+	}
+
+	err := runList(opts, client)
+	require.NoError(t, err)
+}
+
+func TestExtractCursor(t *testing.T) {
+	tests := []struct {
+		name     string
+		nextLink string
+		expected string
+	}{
+		{"valid cursor", "/wiki/api/v2/spaces?cursor=abc123&limit=25", "abc123"},
+		{"empty link", "", ""},
+		{"no cursor param", "/wiki/api/v2/spaces?limit=25", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, extractCursor(tt.nextLink))
+		})
+	}
+}
+
 func TestRunList_NullDescription(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
