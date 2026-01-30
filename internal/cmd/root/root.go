@@ -6,6 +6,7 @@ import (
 
 	"github.com/open-cli-collective/confluence-cli/internal/cmd/attachment"
 	"github.com/open-cli-collective/confluence-cli/internal/cmd/completion"
+	"github.com/open-cli-collective/confluence-cli/internal/cmd/configcmd"
 	initcmd "github.com/open-cli-collective/confluence-cli/internal/cmd/init"
 	"github.com/open-cli-collective/confluence-cli/internal/cmd/page"
 	"github.com/open-cli-collective/confluence-cli/internal/cmd/search"
@@ -39,6 +40,7 @@ Get started by running: cfl init`,
 
 	// Subcommands
 	cmd.AddCommand(initcmd.NewCmdInit())
+	cmd.AddCommand(configcmd.NewCmdConfig())
 	cmd.AddCommand(page.NewCmdPage())
 	cmd.AddCommand(space.NewCmdSpace())
 	cmd.AddCommand(attachment.NewCmdAttachment())
