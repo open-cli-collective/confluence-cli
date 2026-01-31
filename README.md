@@ -1,3 +1,12 @@
+> [!IMPORTANT]
+> **This repository has moved to [atlassian-cli](https://github.com/open-cli-collective/atlassian-cli)**
+>
+> **For existing users:** No action needed! Your Homebrew/Chocolatey/Winget installation will continue to receive updates automatically.
+>
+> **For new issues/PRs:** Please file them at [atlassian-cli](https://github.com/open-cli-collective/atlassian-cli/issues).
+>
+> This repository is now archived and read-only.
+
 # cfl - Confluence CLI
 
 A command-line interface for Atlassian Confluence Cloud, inspired by [jira-cli](https://github.com/ankitpokhrel/jira-cli).
